@@ -24,7 +24,7 @@ class EngineCalibrator(trt.IInt8Calibrator):
         self.progress_bar: Optional[tqdm] = None
         self.image_batcher: Optional[BaseBatcher] = None
         self.batch_tensor: Optional[torch.Tensor] = None
-        self.batch_generator: Optional[Generator[np.ndarray]] = None
+        self.batch_generator: Optional[Generator[torch.Tensor]] = None
 
         self.logger = get_logger("export_calibrator")
         self.cache_path = Path(cache_path)

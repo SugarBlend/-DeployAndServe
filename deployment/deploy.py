@@ -1,9 +1,11 @@
 from models.export import ExportConfig
-from deployment.custom_export.yolo import YoloExporter, YoloExecutor
+
+from deployment.custom.yolo.export import YoloExporter
+from deployment.custom.yolo.executor import YoloExecutor
 
 
 def converter() -> None:
-    weights_path = "weights/pytorch/yolo12m.pt"
+    weights_path = "weights/pytorch/yolov9m.pt"
     deploy_config = "configs/export_yolo.yml"
     config = ExportConfig.from_file(deploy_config)
 

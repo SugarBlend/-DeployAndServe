@@ -17,7 +17,6 @@ class ORTExecutor(BaseExecutor):
         provider_options = {
             "device_id": torch.device(self.config.device).index,
             "arena_extend_strategy": "kSameAsRequested",
-            "gpu_mem_limit": int(1<<30) // 4,
             "cudnn_conv_algo_search": "HEURISTIC",
             "do_copy_in_default_stream": True,
             "enable_cuda_graph": True,

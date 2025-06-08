@@ -35,26 +35,15 @@ class Exporter(ABC):
     def convert(self, backend: Backend) -> None:
         exporter = self.export_factory.create(backend)(self.config)
 
-        # for k, v in self.__dict__.items():
-        #     if not callable(v) and not k.startswith('__'):
-        #         setattr(exporter, k, v)
-
-            # 3. Специальная обработка для TensorRT
         if backend == Backend.TensorRT:
             if hasattr(self, 'register_tensorrt_plugins'):
-                # Правильно привязываем метод к новому экземпляру
                 exporter.register_tensorrt_plugins = types.MethodType(
-                    self.register_tensorrt_plugins.__func__,  # Берем оригинальную функцию
-                    exporter  # Привязываем к новому экземпляру
+                    self.register_tensorrt_plugins.__func__,
+                    exporter
                 )
 
         exporter.__dict__.update(self.__dict__)
         exporter.export()
-        # self.__dict__.update(exporter.__dict__)
-        self.__dict__.update({
-            k: v for k, v in exporter.__dict__.items()
-            if not callable(v) and not k.startswith('__')
-        })
 
         if self.config.enable_benchmark:
             exporter.benchmark()

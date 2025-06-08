@@ -1,9 +1,10 @@
 from abc import ABC
 import os
 import numpy as np
+from statistics import stdev
 from pathlib import Path
 import torch
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Tuple
 from ultralytics.utils.checks import check_version
 
 from deployment.core.exporters import BaseExporter
@@ -26,47 +27,56 @@ class TensorRTExporter(BaseExporter, ABC):
         raise NotImplemented("This method doesnt implemented in custom class")
 
     def benchmark(self) -> None:
-        pass
-        # from utils.loaders import union_engine_loader, trt
-        # bindings, binding_address, context = union_engine_loader(self.engine_path, self.config.device)
-        #
-        # for shapes in self.config.tensorrt_opts.profile_shapes:
-        #     for batch_shape in shapes.values():
-        #         dummy_input = torch.ones(batch_shape, dtype=torch.float16, device=self.config.device)
-        #
-        #         if check_version(trt.__version__, "<=8.6.1"):
-        #             context.set_binding_shape(0, dummy_input.shape)
-        #         elif check_version(trt.__version__, ">8.6.1"):
-        #             for name in bindings:
-        #                 if bindings[name].io_mode == "input":
-        #                     context.set_input_shape(name, dummy_input.shape)
-        #                     break
-        #
-        #         for _ in range(10):
-        #             context.execute_v2(list(binding_address.values()))
-        #
-        #         timings: List[float] = []
-        #         start = torch.cuda.Event(enable_timing=True)
-        #         end = torch.cuda.Event(enable_timing=True)
-        #         for _ in range(self.config.repeats):
-        #             start.record(torch.cuda.current_stream())
-        #             context.execute_v2(list(binding_address.values()))
-        #             end.record(torch.cuda.current_stream())
-        #             torch.cuda.synchronize()
-        #
-        #             timings.append(start.elapsed_time(end))
-        #         avg_time = np.mean(timings)
-        #         shape = "x".join(list(map(str, batch_shape)))
-        #         self.logger.info(f'[{shape}]: Average inference time: {avg_time:.2f} ms ({1000 / avg_time:.2f} FPS)')
+        from deployment.core.executors.backends.tensrt import TensorRTExecutor
+        import tensorrt as trt
+        bindings, binding_address, context = TensorRTExecutor.load(self.engine_path, self.config.device,
+                                                                   trt.Logger.ERROR)
+        shapes: List[Tuple[int, ...]] = []
+        for profile_shapes in self.config.tensorrt_opts.profile_shapes:
+            shapes.extend(list(profile_shapes.values()))
 
-    def export(
-            self,
-    ) -> None:
+        for batch_shape in set(shapes):
+            dummy_input = torch.ones(batch_shape, dtype=torch.float16, device=self.config.device)
+
+            if check_version(trt.__version__, "<=8.6.1"):
+                context.set_binding_shape(0, dummy_input.shape)
+            elif check_version(trt.__version__, ">8.6.1"):
+                for name in bindings:
+                    if bindings[name].io_mode == "input":
+                        context.set_input_shape(name, dummy_input.shape)
+                        break
+
+            timings: List[float] = []
+            start = torch.cuda.Event(enable_timing=True)
+            end = torch.cuda.Event(enable_timing=True)
+
+            for _ in range(50):
+                context.execute_v2(list(binding_address.values()))
+
+            for _ in range(self.config.repeats):
+                start.record(torch.cuda.current_stream())
+                context.execute_v2(list(binding_address.values()))
+                end.record(torch.cuda.current_stream())
+                torch.cuda.synchronize()
+                timings.append(start.elapsed_time(end))
+
+            avg_time = np.mean(timings)
+            shape = "x".join(list(map(str, batch_shape)))
+
+            self.logger.info(f"[{shape}] Average latency: {avg_time:.2f} ms")
+            self.logger.info(f"[{shape}] Min latency: {min(timings):.2f} ms")
+            self.logger.info(f"[{shape}] Max latency: {max(timings):.2f} ms")
+            self.logger.info(f"[{shape}] Std latency: {stdev(timings):.2f} ms")
+            self.logger.info(f"[{shape}] Average throughput: {1000 / avg_time:.2f} FPS")
+
+    def export(self) -> None:
         if os.path.exists(self.engine_path) and not self.config.tensorrt_opts.force_rebuild:
             return
+
+        self.logger.info("Try to convert ONNX model to TensorRT engine")
         Path(self.engine_path).parent.mkdir(parents=True, exist_ok=True)
-        if not os.path.exists(self.onnx_path):
-            raise FileNotFoundError(f"Onnx model is not found by this way: {self.onnx_path}")
+        if not os.path.exists(self.config.onnx_opts.output_file):
+            raise FileNotFoundError(f"Onnx model is not found by this way: {self.config.onnx_opts.output_file}")
 
         import tensorrt as trt
         logger = trt.Logger(self.config.tensorrt_opts.log_level)
@@ -75,7 +85,7 @@ class TensorRTExporter(BaseExporter, ABC):
         config = builder.create_builder_config()
         network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
 
-        with open(self.onnx_path, "rb") as file, trt.OnnxParser(network, logger) as parser:
+        with open(self.config.onnx_opts.output_file, "rb") as file, trt.OnnxParser(network, logger) as parser:
             if not parser.parse(file.read()):
                 for error in range(parser.num_errors):
                     logger.log(logger.INTERNAL_ERROR, parser.get_error(error))
@@ -120,7 +130,6 @@ class TensorRTExporter(BaseExporter, ABC):
                     pass
             config.set_flag(flag)
 
-
         if self.config.tensorrt_opts.precision in [trt.BuilderFlag.INT4, trt.BuilderFlag.INT8]:
             config.set_flag(trt.BuilderFlag.FP16)
             config.int8_calibrator = self.calibrator
@@ -149,4 +158,4 @@ class TensorRTExporter(BaseExporter, ABC):
             if self.config.tensorrt_opts.enable_timing_cache:
                 with open(cache_file, "wb") as file:
                     file.write(timing_cache.serialize())
-        logger.log(logger.INFO, f"Weights successfully build by this way: {self.engine_path}")
+        self.logger.info(f"TensorRT engine successfully stored in: {self.engine_path}")
