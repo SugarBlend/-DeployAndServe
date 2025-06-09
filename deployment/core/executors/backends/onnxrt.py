@@ -1,8 +1,9 @@
-import numpy as np
 from pathlib import Path
+from typing import Any, List, Optional, Sequence, Tuple, Union
+
+import numpy as np
 import onnxruntime as ort
 import torch
-from typing import Tuple, Union, List, Any, Optional, Sequence
 
 from deployment.core.executors.base import BaseExecutor, ExportConfig
 
@@ -24,15 +25,16 @@ class ORTExecutor(BaseExecutor):
             "use_tf32": True,
         }
 
-        self.session, self.input_names, self.output_names = self.load(self.config.onnx_opts.output_file,
-                                                                      sess_options, ['CUDAExecutionProvider'],
-                                                                      [provider_options])
+        self.session, self.input_names, self.output_names = self.load(
+            self.config.onnx_opts.output_file, sess_options, ["CUDAExecutionProvider"], [provider_options]
+        )
+
     @staticmethod
     def load(
-            onnx_path: Union[str, Path],
-            sess_options: Optional[ort.SessionOptions],
-            providers: Optional[Sequence[str | tuple[str, dict[Any, Any]]]],
-            provider_options: Optional[Sequence[dict[Any, Any]]]
+        onnx_path: Union[str, Path],
+        sess_options: Optional[ort.SessionOptions],
+        providers: Optional[Sequence[str | tuple[str, dict[Any, Any]]]],
+        provider_options: Optional[Sequence[dict[Any, Any]]],
     ) -> Tuple[ort.InferenceSession, List[str], List[str]]:
         inference_session = ort.InferenceSession(onnx_path, sess_options, providers, provider_options)
         input_names = [inp.name for inp in inference_session.get_inputs()]

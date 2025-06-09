@@ -29,8 +29,8 @@ tensorrt_opts:
     - "SPARSE_WEIGHTS"
   profiling_verbosity: "NONE"
   max_aux_streams: 4
-  runtime_platform: "SAME_AS_BUILD"
-  compatibility_level: "SAME_COMPUTE_CAPABILITY"
+  runtime_platform: null
+  compatibility_level: null
   tactics: null
   enable_timing_cache: true
   enable_calibration_cache: true

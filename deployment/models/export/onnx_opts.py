@@ -1,5 +1,6 @@
+from typing import Any, Mapping, Optional, Sequence, Union
+
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional, Sequence, Mapping, Union, Any
 from torch.onnx import _C_onnx
 
 
@@ -10,7 +11,9 @@ class OnnxConfig(BaseModel):
     input_names: Optional[Sequence[str]] = Field(default=None, description="")
     output_names: Optional[Sequence[str]] = Field(default=None, description="")
     opset_version: Optional[int] = Field(default=13, description="")
-    dynamic_axes: Optional[Union[Mapping[str, Mapping[int, str]], Mapping[str, Sequence[int]]]] = Field(default=None, description="")
+    dynamic_axes: Optional[Union[Mapping[str, Mapping[int, str]], Mapping[str, Sequence[int]]]] = Field(
+        default=None, description=""
+    )
     training: Union[str, _C_onnx.TrainingMode] = Field(default=_C_onnx.TrainingMode.EVAL, description="")
     do_constant_folding: bool = Field(default=True, description="")
 

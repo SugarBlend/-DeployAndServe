@@ -1,9 +1,10 @@
-from abc import ABC, abstractmethod
-import torch.nn
-from typing import Dict, Type, Any, Optional
 import types
+from abc import ABC, abstractmethod
+from typing import Any, Dict, Optional, Type
 
-from deployment.core.exporters import OpenVINOExporter, BaseExporter, TensorRTExporter, ONNXExporter
+import torch.nn
+
+from deployment.core.exporters import BaseExporter, ONNXExporter, OpenVINOExporter, TensorRTExporter
 from deployment.models.export import Backend, ExportConfig
 
 
@@ -26,7 +27,7 @@ class Exporter(ABC):
     def __init__(self, config: ExportConfig) -> None:
         self.config: ExportConfig = config
         self.export_factory = ExporterFactory()
-        self.model : Optional[torch.nn.Module] = None
+        self.model: Optional[torch.nn.Module] = None
 
     @abstractmethod
     def load_checkpoints(self, **kwargs) -> Any:
@@ -36,11 +37,8 @@ class Exporter(ABC):
         exporter = self.export_factory.create(backend)(self.config)
 
         if backend == Backend.TensorRT:
-            if hasattr(self, 'register_tensorrt_plugins'):
-                exporter.register_tensorrt_plugins = types.MethodType(
-                    self.register_tensorrt_plugins.__func__,
-                    exporter
-                )
+            if hasattr(self, "register_tensorrt_plugins"):
+                exporter.register_tensorrt_plugins = types.MethodType(self.register_tensorrt_plugins.__func__, exporter)
 
         exporter.__dict__.update(self.__dict__)
         exporter.export()

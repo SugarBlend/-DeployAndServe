@@ -1,10 +1,9 @@
 import os
-import numpy as np
 from pathlib import Path
+from typing import Generator, List, Optional
+import tensorrt as trt
 import torch
 from tqdm import tqdm
-import tensorrt as trt
-from typing import Optional, List, Generator
 
 from deployment.core.exporters.calibration.base_batcher import BaseBatcher
 from deployment.models.export import TensorrtConfig
@@ -13,9 +12,9 @@ from utils.logger import get_logger
 
 class EngineCalibrator(trt.IInt8Calibrator):
     def __init__(
-            self,
-            tensorrt_config: TensorrtConfig,
-            cache_path: str,
+        self,
+        tensorrt_config: TensorrtConfig,
+        cache_path: str,
     ) -> None:
         super(EngineCalibrator, self).__init__()
         self.tensorrt_config: TensorrtConfig = tensorrt_config

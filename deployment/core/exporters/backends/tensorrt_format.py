@@ -1,15 +1,16 @@
-from abc import ABC
 import os
-import numpy as np
-from statistics import stdev
+from abc import ABC
 from pathlib import Path
+from statistics import stdev
+from typing import Any, List, Optional, Tuple
+
+import numpy as np
 import torch
-from typing import List, Optional, Any, Tuple
 from ultralytics.utils.checks import check_version
 
 from deployment.core.exporters import BaseExporter
-from deployment.core.exporters.calibration.base_calibrator import EngineCalibrator
 from deployment.core.exporters.calibration.base_batcher import BaseBatcher
+from deployment.core.exporters.calibration.base_calibrator import EngineCalibrator
 from deployment.models.export import ExportConfig, Precision
 from utils.logger import get_logger
 
@@ -24,13 +25,16 @@ class TensorRTExporter(BaseExporter, ABC):
         self.logger = get_logger("tensorrt")
 
     def register_tensorrt_plugins(self, *args, **kwargs) -> Any:
-        raise NotImplemented("This method doesnt implemented in custom class")
+        raise NotImplementedError("This method doesnt implemented in custom class")
 
     def benchmark(self) -> None:
-        from deployment.core.executors.backends.tensrt import TensorRTExecutor
         import tensorrt as trt
-        bindings, binding_address, context = TensorRTExecutor.load(self.engine_path, self.config.device,
-                                                                   trt.Logger.ERROR)
+
+        from deployment.core.executors.backends.tensrt import TensorRTExecutor
+
+        bindings, binding_address, context = TensorRTExecutor.load(
+            self.engine_path, self.config.device, trt.Logger.ERROR
+        )
         shapes: List[Tuple[int, ...]] = []
         for profile_shapes in self.config.tensorrt_opts.profile_shapes:
             shapes.extend(list(profile_shapes.values()))
@@ -79,6 +83,7 @@ class TensorRTExporter(BaseExporter, ABC):
             raise FileNotFoundError(f"Onnx model is not found by this way: {self.config.onnx_opts.output_file}")
 
         import tensorrt as trt
+
         logger = trt.Logger(self.config.tensorrt_opts.log_level)
         trt.init_libnvinfer_plugins(logger, namespace="")
         builder = trt.Builder(logger)
@@ -111,21 +116,25 @@ class TensorRTExporter(BaseExporter, ABC):
         config.avg_timing_iterations = 8
 
         if check_version(trt.__version__, ">=9.1.0"):
-            config.runtime_platform = self.config.tensorrt_opts.runtime_platform
-            config.hardware_compatibility_level = self.config.tensorrt_opts.compatibility_level
+            if self.config.tensorrt_opts.runtime_platform:
+                config.runtime_platform = self.config.tensorrt_opts.runtime_platform
+            if self.config.tensorrt_opts.compatibility_level:
+                config.hardware_compatibility_level = self.config.tensorrt_opts.compatibility_level
 
         if self.config.tensorrt_opts.tactics and len(self.config.tensorrt_opts.tactics):
             tactics: int = 0
             for tactic in self.config.tensorrt_opts.tactics:
-                tactics |= (1 << int(tactic))
+                tactics |= 1 << int(tactic)
             config.set_tactic_sources(tactics)
 
         for flag in [*self.config.tensorrt_opts.flags, self.config.tensorrt_opts.precision]:
             if flag.name in dir(Precision):
                 try:
                     if not getattr(builder, f"platform_has_fast_{flag.name}"):
-                        logger.log(trt.Logger.WARNING, "This gpu device doesnt have fast computation "
-                                                       f"on {flag.name} precision")
+                        logger.log(
+                            trt.Logger.WARNING,
+                            "This gpu device doesnt have fast computation " f"on {flag.name} precision",
+                        )
                 except AttributeError:
                     pass
             config.set_flag(flag)

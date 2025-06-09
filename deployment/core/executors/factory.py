@@ -1,10 +1,9 @@
-from abc import abstractmethod, ABC
-from typing import Type, Dict, Any
+from abc import ABC, abstractmethod
+from typing import Any, Dict, Type
 
+from deployment.core.executors import BaseExecutor, ORTExecutor, TensorRTExecutor
 from deployment.models.export import Backend, ExportConfig
-from deployment.core.executors import ORTExecutor, TensorRTExecutor, BaseExecutor
 from utils.logger import get_logger
-
 
 
 class ExtendExecutor(ABC):

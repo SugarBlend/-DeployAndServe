@@ -1,11 +1,13 @@
-import numpy as np
 from pathlib import Path
-import tensorrt as trt
 from typing import Union
+
+import numpy as np
+import tensorrt as trt
 from ultralytics import YOLO
-from deployment.models.export import ExportConfig
+
 from deployment.core.exporters.factory import Exporter
 from deployment.custom.yolo.wrapper import WrappedModel
+from deployment.models.export import ExportConfig
 
 
 class YoloExporter(Exporter):
@@ -17,13 +19,16 @@ class YoloExporter(Exporter):
         self.model = WrappedModel(self.model.model)
 
     def register_tensorrt_plugins(self, network: trt.INetworkDefinition) -> trt.INetworkDefinition:
-        """Register and configure TensorRT plugins for YOLO model with EfficientNMS.
+        """
+        Register and configure TensorRT plugins for YOLO model with
+        EfficientNMS.
 
         Args:
             network: TensorRT network definition to modify
 
         Returns:
             Modified network with plugins integrated
+
         """
 
         plugin = next((plugin for plugin in self.config.tensorrt_opts.plugins if plugin.name == "efficient_nms"), None)
@@ -67,8 +72,16 @@ class YoloExporter(Exporter):
         fields = [
             ("background_class", np.array([-1], dtype=np.int32), trt.PluginFieldType.INT32),
             ("max_output_boxes", np.array([plugin.options["max_det"]], dtype=np.int32), trt.PluginFieldType.INT32),
-            ("score_threshold", np.array([plugin.options["score_threshold"]], dtype=np.float32), trt.PluginFieldType.FLOAT32),
-            ("iou_threshold", np.array([plugin.options["iou_threshold"]], dtype=np.float32), trt.PluginFieldType.FLOAT32),
+            (
+                "score_threshold",
+                np.array([plugin.options["score_threshold"]], dtype=np.float32),
+                trt.PluginFieldType.FLOAT32,
+            ),
+            (
+                "iou_threshold",
+                np.array([plugin.options["iou_threshold"]], dtype=np.float32),
+                trt.PluginFieldType.FLOAT32,
+            ),
             ("box_coding", np.array([1], dtype=np.int32), trt.PluginFieldType.INT32),
             ("score_activation", np.array([0], dtype=np.int32), trt.PluginFieldType.INT32),
         ]
@@ -98,11 +111,7 @@ class YoloExporter(Exporter):
         boxes_reshaped = network.add_shuffle(boxes)
         boxes_reshaped.reshape_dims = trt.Dims([plugin.options["max_det"], 4])
 
-        concat_inputs = [
-            boxes_reshaped.get_output(0),
-            scores_reshaped.get_output(0),
-            classes_reshaped.get_output(0)
-        ]
+        concat_inputs = [boxes_reshaped.get_output(0), scores_reshaped.get_output(0), classes_reshaped.get_output(0)]
         concat_layer = network.add_concatenation(concat_inputs)
         concat_layer.axis = 1
 

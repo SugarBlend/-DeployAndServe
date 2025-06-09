@@ -1,10 +1,11 @@
 from collections import OrderedDict
-import numpy as np
 from pathlib import Path
-from pydantic import BaseModel, Field
+from typing import List, Literal, Tuple, Union
+
+import numpy as np
 import tensorrt as trt
 import torch
-from typing import Tuple, Literal, Union, List
+from pydantic import BaseModel, Field
 from ultralytics.utils.checks import check_version
 
 from deployment.core.executors.base import BaseExecutor, ExportConfig
@@ -28,9 +29,9 @@ class Binding(BaseModel):
 class TensorRTExecutor(BaseExecutor):
     def __init__(self, config: ExportConfig) -> None:
         super(TensorRTExecutor, self).__init__(config)
-        self.bindings, self.binding_address, self.context = self.load(self.config.tensorrt_opts.output_file,
-                                                                      self.config.device,
-                                                                      self.config.tensorrt_opts.log_level)
+        self.bindings, self.binding_address, self.context = self.load(
+            self.config.tensorrt_opts.output_file, self.config.device, self.config.tensorrt_opts.log_level
+        )
         self.async_stream = torch.cuda.Stream(device=config.device, priority=-1)
         for node in self.bindings:
             if self.bindings[node].io_mode == "input":
@@ -39,9 +40,7 @@ class TensorRTExecutor(BaseExecutor):
 
     @staticmethod
     def load(
-            engine_path: Union[str, Path],
-            device: str,
-            log_level: trt.Logger.Severity = trt.Logger.ERROR
+        engine_path: Union[str, Path], device: str, log_level: trt.Logger.Severity = trt.Logger.ERROR
     ) -> Tuple[OrderedDict[str, Binding], OrderedDict[str, int], trt.IExecutionContext]:
         logger = trt.Logger(log_level)
         trt.init_libnvinfer_plugins(logger, namespace="")
@@ -66,7 +65,7 @@ class TensorRTExecutor(BaseExecutor):
                 io_mode = "input" if model.get_tensor_mode(name) == trt.TensorIOMode.INPUT else "output"
                 bindings[name] = Binding(name, dtype, shape, data, int(data.data_ptr()), io_mode)
         else:
-            raise NotImplemented(f"Your version of TensorRT: {trt.__version__} is not implemented")
+            raise NotImplementedError(f"Your version of TensorRT: {trt.__version__} is not implemented")
 
         binding_address = OrderedDict((node, data.ptr) for node, data in bindings.items())
         context = model.create_execution_context()

@@ -1,0 +1,45 @@
+[project]
+name = "execution_samples"
+dynamic = ["version"]
+requires-python = ">=3.10"
+package-mode = false
+
+[tool.poetry]
+version = "0.1.0"
+readme = ["README.md"]
+
+[tool.poetry.dependencies]
+numpy = "1.23.5"
+ultralytics = "^8.3.152"
+tensorrt = "10.10.0.31"
+tritonclient = {extras = ["all"], version =  ">=2.58.0"}
+onnx = "^1.18.0"
+torch = {version = "2.3.0", source="pytorch"}
+torchvision = { version = "0.18.0", source = "pytorch" }
+torchaudio = { version = "2.3.0", source = "pytorch" }
+onnxruntime-gpu = "=1.18.0"
+pydantic = {extras = ["all"], version = "^2.11.5"}
+onnxslim = "^0.1.56"
+fastapi = {extras = ["all"], version =  ">=0.115.12"}
+mmcv = {version = "2.2.0", source="mmcv_prebuilt"}
+opencv-python = ">=4.8.1.78"
+opencv-contrib-python = ">=4.8.1.78"
+
+[tool.poetry.group.formatting.dependencies]
+black = ">=25.1.0"
+flake8 = ">=7.2.0"
+isort = ">=6.0.1"
+pre-commit = "^4.2.0"
+
+[tool.poetry.group.test.dependencies]
+pytest = "^6.0.0"
+
+[[tool.poetry.source]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu121"
+priority = "explicit"
+
+[[tool.poetry.source]]
+name = "mmcv_prebuilt"
+url = "https://download.openmmlab.com/mmcv/dist/cu121/torch2.3/index.html"
+priority = "explicit"

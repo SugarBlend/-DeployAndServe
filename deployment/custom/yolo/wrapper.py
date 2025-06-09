@@ -9,4 +9,3 @@ class WrappedModel(torch.nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         outputs = self.model(x)
         return outputs[0] if isinstance(outputs, (tuple, list)) else outputs
-
