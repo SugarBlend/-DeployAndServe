@@ -13,12 +13,12 @@ from utils.logger import get_logger
 class EngineCalibrator(trt.IInt8Calibrator):
     def __init__(
         self,
-        tensorrt_config: TensorrtConfig,
+        config: TensorrtConfig,
         cache_path: str,
     ) -> None:
         super(EngineCalibrator, self).__init__()
-        self.tensorrt_config: TensorrtConfig = tensorrt_config
-        self.algorithm = self.tensorrt_config.algorithm
+        self.config: TensorrtConfig = config
+        self.algorithm = self.config.specific.algorithm
 
         self.progress_bar: Optional[tqdm] = None
         self.image_batcher: Optional[BaseBatcher] = None
@@ -42,7 +42,7 @@ class EngineCalibrator(trt.IInt8Calibrator):
         if not self.image_batcher:
             return None
 
-        if self.progress_bar is None and self.tensorrt_config.log_level.value < 3:
+        if self.progress_bar is None and self.config.specific.log_level.value < 3:
             self.progress_bar = tqdm(total=len(self.image_batcher.files), desc="INT8 Calibration")
 
         try:
@@ -60,7 +60,7 @@ class EngineCalibrator(trt.IInt8Calibrator):
         return self.algorithm
 
     def read_calibration_cache(self) -> Optional[bytes]:
-        if os.path.exists(self.cache_path) and self.tensorrt_config.enable_calibration_cache:
+        if os.path.exists(self.cache_path) and self.config.enable_calibration_cache:
             self.logger.info(f"Using calibration cache file: {self.cache_path}")
             with open(self.cache_path, "rb") as file:
                 return file.read()

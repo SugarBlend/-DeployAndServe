@@ -26,7 +26,7 @@ class ORTExecutor(BaseExecutor):
         }
 
         self.session, self.input_names, self.output_names = self.load(
-            self.config.onnx_opts.output_file, sess_options, ["CUDAExecutionProvider"], [provider_options]
+            self.config.onnx.output_file, sess_options, ["CUDAExecutionProvider"], [provider_options]
         )
 
     @staticmethod

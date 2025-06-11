@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Type
+from typing import Any, Dict, Type, Optional
 
 from deployment.core.executors import BaseExecutor, ORTExecutor, TensorRTExecutor
 from deployment.models.export import Backend, ExportConfig
@@ -9,6 +9,7 @@ from utils.logger import get_logger
 class ExtendExecutor(ABC):
     def __init__(self, config: ExportConfig) -> None:
         self.config: ExportConfig = config
+        self.backend: Optional[Backend] = None
         self.executor_factory = ExecutorFactory()
         self.logger = get_logger("executor")
 
@@ -25,6 +26,7 @@ class ExtendExecutor(ABC):
         pass
 
     def visualization(self, backend: Backend) -> None:
+        self.backend = backend
         executor = self.executor_factory.create(backend)(self.config)
 
         for name in dir(executor):
@@ -38,8 +40,7 @@ class ExtendExecutor(ABC):
                     if isinstance(attr, (classmethod, staticmethod)):
                         continue
                     setattr(self.__class__, name, attr)
-
-        self.plotter(backend)
+        self.plotter()
 
 
 class ExecutorFactory(object):

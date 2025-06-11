@@ -1,5 +1,4 @@
 import os
-from abc import ABC
 from pathlib import Path
 from statistics import stdev
 from typing import Any, List, Optional, Tuple
@@ -15,28 +14,29 @@ from deployment.models.export import ExportConfig, Precision
 from utils.logger import get_logger
 
 
-class TensorRTExporter(BaseExporter, ABC):
+class TensorRTExporter(BaseExporter):
     def __init__(self, config: ExportConfig):
         super(TensorRTExporter, self).__init__(config)
-        self.engine_path = Path(self.config.tensorrt_opts.output_file)
+        self.engine_path = Path(self.config.tensorrt.output_file)
         cache_path = f"{self.engine_path.parent}/calibration_cache/{self.engine_path.stem}.cache"
-        self.calibrator: EngineCalibrator = EngineCalibrator(self.config.tensorrt_opts, cache_path)
+        self.calibrator: EngineCalibrator = EngineCalibrator(self.config.tensorrt, cache_path)
         self.batcher: Optional[BaseBatcher] = None
         self.logger = get_logger("tensorrt")
 
     def register_tensorrt_plugins(self, *args, **kwargs) -> Any:
-        raise NotImplementedError("This method doesnt implemented in custom class")
+        raise NotImplementedError("This method doesn't implemented, your should create him in custom class, "
+                                  "based on ExtendExporter")
 
     def benchmark(self) -> None:
         import tensorrt as trt
-
         from deployment.core.executors.backends.tensrt import TensorRTExecutor
 
         bindings, binding_address, context = TensorRTExecutor.load(
-            self.engine_path, self.config.device, trt.Logger.ERROR
+            self.engine_path, self.config.tensorrt.specific.profile_shapes[0]["max"][0], self.config.device,
+            trt.Logger.ERROR
         )
         shapes: List[Tuple[int, ...]] = []
-        for profile_shapes in self.config.tensorrt_opts.profile_shapes:
+        for profile_shapes in self.config.tensorrt.specific.profile_shapes:
             shapes.extend(list(profile_shapes.values()))
 
         for batch_shape in set(shapes):
@@ -74,23 +74,23 @@ class TensorRTExporter(BaseExporter, ABC):
             self.logger.info(f"[{shape}] Average throughput: {1000 / avg_time:.2f} FPS")
 
     def export(self) -> None:
-        if os.path.exists(self.engine_path) and not self.config.tensorrt_opts.force_rebuild:
+        if os.path.exists(self.engine_path) and not self.config.tensorrt.force_rebuild:
             return
 
         self.logger.info("Try to convert ONNX model to TensorRT engine")
         Path(self.engine_path).parent.mkdir(parents=True, exist_ok=True)
-        if not os.path.exists(self.config.onnx_opts.output_file):
-            raise FileNotFoundError(f"Onnx model is not found by this way: {self.config.onnx_opts.output_file}")
+        if not os.path.exists(self.config.onnx.output_file):
+            raise FileNotFoundError(f"Onnx model is not found by this way: {self.config.onnx.output_file}")
 
         import tensorrt as trt
 
-        logger = trt.Logger(self.config.tensorrt_opts.log_level)
+        logger = trt.Logger(self.config.tensorrt.specific.log_level)
         trt.init_libnvinfer_plugins(logger, namespace="")
         builder = trt.Builder(logger)
         config = builder.create_builder_config()
         network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
 
-        with open(self.config.onnx_opts.output_file, "rb") as file, trt.OnnxParser(network, logger) as parser:
+        with open(self.config.onnx.output_file, "rb") as file, trt.OnnxParser(network, logger) as parser:
             if not parser.parse(file.read()):
                 for error in range(parser.num_errors):
                     logger.log(logger.INTERNAL_ERROR, parser.get_error(error))
@@ -99,35 +99,35 @@ class TensorRTExporter(BaseExporter, ABC):
         profile = builder.create_optimization_profile()
         input_tensor = network.get_input(0)
 
-        for shapes in self.config.tensorrt_opts.profile_shapes:
+        for shapes in self.config.tensorrt.specific.profile_shapes:
             profile.set_shape(input_tensor.name, **shapes)
 
         if config.add_optimization_profile(profile) < 0:
             logger.log(logger.WARNING, f"Invalid optimization profile {profile}")
 
-        if self.config.tensorrt_opts.precision.name in [trt.BuilderFlag.INT4.name, trt.BuilderFlag.INT8.name]:
+        if self.config.tensorrt.specific.precision.name in [trt.BuilderFlag.INT4.name, trt.BuilderFlag.INT8.name]:
             config.set_calibration_profile(profile)
 
-        config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, self.config.tensorrt_opts.workspace)
-        config.profiling_verbosity = self.config.tensorrt_opts.profiling_verbosity
+        config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, self.config.tensorrt.specific.workspace)
+        config.profiling_verbosity = self.config.tensorrt.specific.profiling_verbosity
 
         if check_version(trt.__version__, ">8.6.1"):
-            config.max_aux_streams = self.config.tensorrt_opts.max_aux_streams
+            config.max_aux_streams = self.config.tensorrt.specific.max_aux_streams
         config.avg_timing_iterations = 8
 
         if check_version(trt.__version__, ">=9.1.0"):
-            if self.config.tensorrt_opts.runtime_platform:
-                config.runtime_platform = self.config.tensorrt_opts.runtime_platform
-            if self.config.tensorrt_opts.compatibility_level:
-                config.hardware_compatibility_level = self.config.tensorrt_opts.compatibility_level
+            if self.config.tensorrt.specific.runtime_platform:
+                config.runtime_platform = self.config.tensorrt.specific.runtime_platform
+            if self.config.tensorrt.specific.compatibility_level:
+                config.hardware_compatibility_level = self.config.tensorrt.specific.compatibility_level
 
-        if self.config.tensorrt_opts.tactics and len(self.config.tensorrt_opts.tactics):
+        if self.config.tensorrt.specific.tactics and len(self.config.tensorrt.specific.tactics):
             tactics: int = 0
-            for tactic in self.config.tensorrt_opts.tactics:
+            for tactic in self.config.tensorrt.specific.tactics:
                 tactics |= 1 << int(tactic)
             config.set_tactic_sources(tactics)
 
-        for flag in [*self.config.tensorrt_opts.flags, self.config.tensorrt_opts.precision]:
+        for flag in [*self.config.tensorrt.specific.flags, self.config.tensorrt.specific.precision]:
             if flag.name in dir(Precision):
                 try:
                     if not getattr(builder, f"platform_has_fast_{flag.name}"):
@@ -139,7 +139,7 @@ class TensorRTExporter(BaseExporter, ABC):
                     pass
             config.set_flag(flag)
 
-        if self.config.tensorrt_opts.precision in [trt.BuilderFlag.INT4, trt.BuilderFlag.INT8]:
+        if self.config.tensorrt.specific.precision in [trt.BuilderFlag.INT4, trt.BuilderFlag.INT8]:
             config.set_flag(trt.BuilderFlag.FP16)
             config.int8_calibrator = self.calibrator
             config.int8_calibrator.set_image_batcher(self.batcher)
@@ -151,7 +151,7 @@ class TensorRTExporter(BaseExporter, ABC):
         for node in [*inputs, *outputs]:
             logger.log(logger.INFO, f"Node '{node.name}' with shape {node.shape} and dtype {node.dtype}")
 
-        if self.config.tensorrt_opts.enable_timing_cache:
+        if self.config.tensorrt.enable_timing_cache:
             cache_folder = Path(self.engine_path).parent.joinpath("timing_cache")
             cache_folder.mkdir(parents=True, exist_ok=True)
             cache_file = cache_folder.joinpath(f"{self.engine_path.stem}.cache")
@@ -164,7 +164,7 @@ class TensorRTExporter(BaseExporter, ABC):
 
         with builder.build_serialized_network(network, config) as engine, open(self.engine_path, "wb") as file:
             file.write(engine)
-            if self.config.tensorrt_opts.enable_timing_cache:
+            if self.config.tensorrt.enable_timing_cache:
                 with open(cache_file, "wb") as file:
                     file.write(timing_cache.serialize())
         self.logger.info(f"TensorRT engine successfully stored in: {self.engine_path}")

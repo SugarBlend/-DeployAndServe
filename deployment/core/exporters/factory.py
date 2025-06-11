@@ -1,7 +1,6 @@
 import types
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, Type
-
 import torch.nn
 
 from deployment.core.exporters import BaseExporter, ONNXExporter, OpenVINOExporter, TensorRTExporter
@@ -39,6 +38,9 @@ class Exporter(ABC):
         if backend == Backend.TensorRT:
             if hasattr(self, "register_tensorrt_plugins"):
                 exporter.register_tensorrt_plugins = types.MethodType(self.register_tensorrt_plugins.__func__, exporter)
+        elif backend == Backend.ONNX:
+            if hasattr(self, "register_onnx_plugins"):
+                exporter.register_onnx_plugins = types.MethodType(self.register_onnx_plugins.__func__, exporter)
 
         exporter.__dict__.update(self.__dict__)
         exporter.export()

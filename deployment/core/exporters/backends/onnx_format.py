@@ -3,25 +3,20 @@ from copy import deepcopy
 from pathlib import Path
 from statistics import stdev
 from typing import List
-
 import numpy as np
 import onnx
 import onnxslim
 import torch
+import warnings
 
-from deployment.core.exporters import BaseExporter, ExportConfig
+from deployment.core.exporters.base import BaseExporter, ExportConfig
 from utils.logger import get_logger
 
 
 class ONNXExporter(BaseExporter):
     def __init__(self, config: ExportConfig) -> None:
         super(ONNXExporter, self).__init__(config)
-        dict_cfg = self.config.onnx_opts.model_dump()
-        self.force_rebuild = dict_cfg.pop("force_rebuild")
-        self.simplify = dict_cfg.pop("simplify")
-        output_file = dict_cfg.pop("output_file")
-        self.onnx_opts = dict_cfg
-        self.onnx_path = Path(output_file)
+        self.onnx_path = Path(self.config.onnx.output_file)
         self.onnx_path.parent.mkdir(exist_ok=True, parents=True)
         self.logger = get_logger("onnx")
 
@@ -73,9 +68,11 @@ class ONNXExporter(BaseExporter):
         self.logger.info(f"[{shape}] Average throughput: {1000 / avg_time:.2f} FPS")
 
     def export(self) -> None:
-        if os.path.exists(self.onnx_path) and not self.force_rebuild:
+        if os.path.exists(self.onnx_path) and not self.config.onnx.force_rebuild:
             return
 
+        from torch.jit import TracerWarning
+        warnings.filterwarnings("ignore", category=TracerWarning)
         self.logger.info("Try to convert PyTorch model to ONNX format")
         model = deepcopy(self.model)
         device = torch.device(self.config.device)
@@ -86,11 +83,13 @@ class ONNXExporter(BaseExporter):
         model.float()
 
         dummy_input = torch.zeros((1, 3, *self.config.input_shape), dtype=torch.float32, device=device)
-        torch.onnx.export(model, (dummy_input,), str(self.onnx_path), **self.onnx_opts)
+        options = self.config.onnx.specific.model_dump()
+        torch.onnx.export(model, (dummy_input,), str(self.onnx_path), **options)
+        self.register_onnx_plugins()
 
         onnx_model = onnx.load(self.onnx_path)
         onnx.checker.check_model(onnx_model)
-        if self.simplify:
+        if self.config.onnx.simplify:
             self.logger.info("Try to simplify ONNX model")
             onnxslim.slim(
                 onnx_model,
@@ -101,3 +100,7 @@ class ONNXExporter(BaseExporter):
             )
             self.logger.info("Simplification successfully done")
         self.logger.info(f"ONNX model successfully stored in: {self.onnx_path}")
+
+    def register_onnx_plugins(self):
+        raise NotImplementedError("This method doesn't implemented, your should create him in custom class, "
+                                  "based on ExtendExporter")

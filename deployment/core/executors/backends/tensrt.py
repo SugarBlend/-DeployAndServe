@@ -1,10 +1,9 @@
 from collections import OrderedDict
 from pathlib import Path
-from typing import List, Literal, Tuple, Union
-
 import numpy as np
-import tensorrt as trt
 import torch
+import tensorrt as trt
+from typing import List, Literal, Tuple, Union
 from pydantic import BaseModel, Field
 from ultralytics.utils.checks import check_version
 
@@ -14,12 +13,13 @@ from deployment.core.executors.base import BaseExecutor, ExportConfig
 class Binding(BaseModel):
     name: str = Field(description="Node name.")
     dtype: type = Field(description="Type of node tensor.")
-    shape: Tuple[int, ...] = Field(description="Shape of node tensor.")
+    shape: Union[Tuple[int, ...], List[int]] = Field(description="Shape of node tensor.")
     data: torch.Tensor = Field(description="Pytorch tensor pinned for current name of node.")
     ptr: int = Field(description="Address of current named tensor on gpu.")
     io_mode: Literal["output", "input"] = Field(description="Type of node (input / output).")
 
-    def __init__(self, name: str, dtype: type, shape: Tuple[int, ...], data: torch.Tensor, ptr: int, io_mode: str):
+    def __init__(self, name: str, dtype: type, shape: Union[List[int], Tuple[int, ...]], data: torch.Tensor,
+                 ptr: int, io_mode: str) -> None:
         super().__init__(name=name, dtype=dtype, shape=shape, data=data, ptr=ptr, io_mode=io_mode)
 
     class Config:
@@ -30,7 +30,8 @@ class TensorRTExecutor(BaseExecutor):
     def __init__(self, config: ExportConfig) -> None:
         super(TensorRTExecutor, self).__init__(config)
         self.bindings, self.binding_address, self.context = self.load(
-            self.config.tensorrt_opts.output_file, self.config.device, self.config.tensorrt_opts.log_level
+            self.config.tensorrt.output_file, self.config.tensorrt.specific.profile_shapes[0]["max"][0],
+            self.config.device, self.config.tensorrt.specific.log_level
         )
         self.async_stream = torch.cuda.Stream(device=config.device, priority=-1)
         for node in self.bindings:
@@ -40,7 +41,7 @@ class TensorRTExecutor(BaseExecutor):
 
     @staticmethod
     def load(
-        engine_path: Union[str, Path], device: str, log_level: trt.Logger.Severity = trt.Logger.ERROR
+        engine_path: Union[str, Path], max_batch: int, device: str, log_level: trt.Logger.Severity = trt.Logger.ERROR
     ) -> Tuple[OrderedDict[str, Binding], OrderedDict[str, int], trt.IExecutionContext]:
         logger = trt.Logger(log_level)
         trt.init_libnvinfer_plugins(logger, namespace="")
@@ -52,7 +53,8 @@ class TensorRTExecutor(BaseExecutor):
             for index in range(model.num_bindings):
                 name = model.get_binding_name(index)
                 dtype = trt.nptype(model.get_binding_dtype(index))
-                shape = tuple(model.get_binding_shape(index))
+                shape = list(model.get_binding_shape(index))
+                shape[0] = max_batch
                 data = torch.from_numpy(np.empty(shape, dtype=np.dtype(dtype))).to(device)
                 io_mode = "input" if model.binding_is_input(index) else "output"
                 bindings[name] = Binding(name, dtype, shape, data, int(data.data_ptr()), io_mode)
@@ -60,7 +62,8 @@ class TensorRTExecutor(BaseExecutor):
             for index in range(model.num_io_tensors):
                 name = model.get_tensor_name(index)
                 dtype = trt.nptype(model.get_tensor_dtype(name))
-                shape = tuple(model.get_tensor_shape(name))
+                shape = list(model.get_tensor_shape(name))
+                shape[0] = max_batch
                 data = torch.from_numpy(np.zeros(shape, dtype=np.dtype(dtype))).to(torch.device(device))
                 io_mode = "input" if model.get_tensor_mode(name) == trt.TensorIOMode.INPUT else "output"
                 bindings[name] = Binding(name, dtype, shape, data, int(data.data_ptr()), io_mode)

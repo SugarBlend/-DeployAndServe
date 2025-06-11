@@ -17,7 +17,7 @@ onnx = "^1.18.0"
 torch = {version = "2.3.0", source="pytorch"}
 torchvision = { version = "0.18.0", source = "pytorch" }
 torchaudio = { version = "2.3.0", source = "pytorch" }
-onnxruntime-gpu = "=1.18.0"
+onnxruntime-gpu = ">=1.18.1"
 pydantic = {extras = ["all"], version = "^2.11.5"}
 onnxslim = "^0.1.56"
 fastapi = {extras = ["all"], version =  ">=0.115.12"}
