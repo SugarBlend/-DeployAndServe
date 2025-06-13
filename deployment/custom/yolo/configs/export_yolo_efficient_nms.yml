@@ -34,7 +34,7 @@ tensorrt:
     algorithm: "ENTROPY_CALIBRATION_2"
   enable_timing_cache: true
   enable_calibration_cache: true
-  output_file: "weights/tensorrt/model.engine"
+  output_file: "weights/tensorrt/model.plan"
   force_rebuild: true
 onnx:
   specific:

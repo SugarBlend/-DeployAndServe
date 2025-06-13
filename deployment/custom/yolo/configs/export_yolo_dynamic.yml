@@ -12,8 +12,8 @@ tensorrt:
     precision: "fp16"
     profile_shapes:
       - min: [1, 3, 384, 640]
-        opt: [1, 3, 384, 640]
-        max: [1, 3, 384, 640]
+        opt: [4, 3, 384, 640]
+        max: [8, 3, 384, 640]
     workspace: 268435456
     flags:
       - "TF32"
@@ -28,7 +28,7 @@ tensorrt:
     algorithm: "ENTROPY_CALIBRATION_2"
   enable_timing_cache: true
   enable_calibration_cache: true
-  output_file: "weights/tensorrt/model.engine"
+  output_file: "weights/tensorrt/model.plan"
   force_rebuild: true
 onnx:
   specific:

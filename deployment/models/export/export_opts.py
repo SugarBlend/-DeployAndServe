@@ -30,7 +30,7 @@ class ExportConfig(BaseModel):
         return val
 
     @classmethod
-    def from_file(cls, path: Union[str, Path]) -> "ExportConfig":
+    def from_file(cls, path: str) -> "ExportConfig":
         if path.endswith(".json"):
             with open(path, "r", encoding="utf-8") as file:
                 data = json.load(file)
