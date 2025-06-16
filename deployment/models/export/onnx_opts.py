@@ -67,7 +67,7 @@ class OnnxConfig(BaseModel):
     specific: SpecificOptions = Field(description="Specific options for build in onnx format.")
     plugins: List[Plugin] = Field(default=[], description="List of plugins, which can be connect to model.")
     simplify: bool = Field(default=True, description="Enable simplify onnx model structure.")
-    output_file: str = Field(default="deploy_results/onnx/model.onnx", description="Path to save converted model.")
+    output_file: str = Field(default="weights/onnx/model.onnx", description="Path to save converted model.")
     force_rebuild: bool = Field(description="Forcefully rebuild the existing model.")
 
     class Config:

@@ -1,4 +1,5 @@
 formats:
+  - torchscript
   - onnx
   - tensorrt
 input_shape: [384, 640]
@@ -47,4 +48,8 @@ onnx:
     do_constant_folding: true
   simplify: true
   output_file: "weights/onnx/model.onnx"
+  force_rebuild: true
+torchscript:
+  optimize: false
+  output_file: "weights/torchscript/model.pt"
   force_rebuild: true

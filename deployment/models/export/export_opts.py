@@ -1,6 +1,5 @@
 import json
-from pathlib import Path
-from typing import List, Tuple, Union
+from typing import List, Tuple
 import torch.cuda
 import yaml
 from pydantic import BaseModel, Field, field_validator
@@ -8,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 from deployment.models.export.common import Backend
 from deployment.models.export.onnx_opts import OnnxConfig
 from deployment.models.export.tensorrt_opts import TensorrtConfig
+from deployment.models.export.torchscript_opts import TorchScriptConfig
 
 
 class ExportConfig(BaseModel):
@@ -22,6 +22,7 @@ class ExportConfig(BaseModel):
         description="Config file which consider parameters for convertation to tensorrt format."
     )
     onnx: OnnxConfig = Field(description="Config file which consider parameters for convertation to onnx format.")
+    torchscript: TorchScriptConfig = Field(description="Configuration for TorchScript format convertation.")
 
     @field_validator("device", mode="before")
     def parse_device(cls, val: str) -> str:

@@ -3,15 +3,16 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional, Type
 import torch.nn
 
-from deployment.core.exporters import BaseExporter, ONNXExporter, OpenVINOExporter, TensorRTExporter
+from deployment.core.exporters import BaseExporter, ONNXExporter, OpenVINOExporter, TensorRTExporter, TorchScriptExporter
 from deployment.models.export import Backend, ExportConfig
 
 
 class ExporterFactory(object):
     _exporters: Dict[Backend, Type[BaseExporter]] = {
+        Backend.TorchScript: TorchScriptExporter,
         Backend.ONNX: ONNXExporter,
         Backend.TensorRT: TensorRTExporter,
-        Backend.OpenVINO: OpenVINOExporter,
+        Backend.OpenVINO: OpenVINOExporter
     }
 
     @classmethod

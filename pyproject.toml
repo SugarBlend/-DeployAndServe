@@ -12,7 +12,6 @@ readme = ["README.md"]
 numpy = "1.23.5"
 ultralytics = "^8.3.152"
 tensorrt = "10.10.0.31"
-tritonclient = {extras = ["all"], version =  ">=2.58.0"}
 onnx = "^1.18.0"
 torch = {version = "2.3.0", source="pytorch"}
 torchvision = { version = "0.18.0", source = "pytorch" }
@@ -24,6 +23,8 @@ fastapi = {extras = ["all"], version =  ">=0.115.12"}
 mmcv = {version = "2.2.0", source="mmcv_prebuilt"}
 opencv-python = ">=4.8.1.78"
 opencv-contrib-python = ">=4.8.1.78"
+ffmpeg-downloader = "0.4.0"
+ffmpegcv = {extras = ["cuda"], version = "0.3.18"}
 
 [tool.poetry.group.formatting.dependencies]
 black = ">=25.1.0"
@@ -33,6 +34,18 @@ pre-commit = "^4.2.0"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^6.0.0"
+
+[tool.poetry.group.torchserve]
+torchserve = "0.12.0"
+torch-model-archiver = "0.12.0"
+torch-workflow-archiver = "0.2.15"
+pynvml = "11.5.0"
+
+[tool.poetry.group.triton]
+tritonclient = {extras = ["all"], version =  ">=2.58.0"}
+
+[tool.poetry.group.bentoml]
+bentoml = "^1.4.15"
 
 [[tool.poetry.source]]
 name = "pytorch"

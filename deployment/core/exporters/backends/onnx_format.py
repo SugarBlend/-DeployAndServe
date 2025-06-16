@@ -71,8 +71,6 @@ class ONNXExporter(BaseExporter):
         if os.path.exists(self.onnx_path) and not self.config.onnx.force_rebuild:
             return
 
-        from torch.jit import TracerWarning
-        warnings.filterwarnings("ignore", category=TracerWarning)
         self.logger.info("Try to convert PyTorch model to ONNX format")
         model = deepcopy(self.model)
         device = torch.device(self.config.device)

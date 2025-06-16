@@ -16,7 +16,7 @@ class Precision(str, Enum):
 class Backend(str, Enum):
     Torch = "torch"
     TensorRT = "tensorrt"
-    TorchScript = "torch_script"
+    TorchScript = "torchscript"
     OpenVINO = "openvino"
     ONNX = "onnx"
 

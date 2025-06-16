@@ -136,7 +136,7 @@ class TensorrtConfig(BaseModel):
     plugins: List[Plugin] = Field(default=[], description="List of plugins, which can be connect to model.")
     force_rebuild: bool = Field(default=False, description="Forcefully rebuild the existing model.")
     output_file: str = Field(
-        default="deploy_results/tensorrt/model.engine", description="Path to save converted model."
+        default="weights/tensorrt/model.plan", description="Path to save converted model."
     )
 
     class Config:
