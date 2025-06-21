@@ -19,12 +19,15 @@ class ONNXExporter(BaseExporter):
         self.onnx_path.parent.mkdir(exist_ok=True, parents=True)
         self.logger = get_logger("onnx")
 
-    def benchmark(self) -> None:
-        self.logger.info(f"Start benchmark of model: {self.onnx_path}")
-        import onnxruntime as ort
+    def register_onnx_plugins(self):
+        raise NotImplementedError("This method doesn't implemented, your should create him in custom class, "
+                                  "based on ExtendExporter")
 
+    def benchmark(self) -> None:
+        import onnxruntime as ort
         from deployment.core.executors.backends.onnxrt import ORTExecutor
 
+        self.logger.info(f"Start benchmark of model: {self.onnx_path}")
         sess_options = ort.SessionOptions()
         sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
@@ -41,7 +44,8 @@ class ONNXExporter(BaseExporter):
         session, input_names, output_names = ORTExecutor.load(
             self.onnx_path, sess_options, ["CUDAExecutionProvider"], [provider_options]
         )
-        placeholder = np.ones((1, 3, *self.config.input_shape), dtype=np.float32)
+        layer_info = next(self.model.parameters())
+        placeholder = torch.ones((1, 3, *self.config.input_shape), dtype=layer_info.dtype).numpy()
 
         timings: List[float] = []
         start = torch.cuda.Event(enable_timing=True)
@@ -70,22 +74,17 @@ class ONNXExporter(BaseExporter):
         if os.path.exists(self.onnx_path) and not self.config.onnx.force_rebuild:
             return
 
-        self.logger.info("Try to convert PyTorch model to ONNX format")
+        self.logger.info("Try convert PyTorch model to ONNX format")
         model = deepcopy(self.model)
-        device = torch.device(self.config.device)
-        for p in model.parameters():
-            p.required_grad = False
-        model.eval()
-        model.to(device)
-        model.float()
-
-        dummy_input = torch.zeros((1, 3, *self.config.input_shape), dtype=torch.float32, device=device)
+        layer_info = next(model.parameters())
+        dummy_input = torch.zeros((1, 3, *self.config.input_shape), dtype=layer_info.dtype, device=layer_info.device)
         options = self.config.onnx.specific.model_dump()
-        torch.onnx.export(model, (dummy_input,), str(self.onnx_path), **options)
+        with self.onnx_patch():
+            torch.onnx.export(model, (dummy_input,), str(self.onnx_path), **options)
         self.register_onnx_plugins()
 
         onnx_model = onnx.load(self.onnx_path)
-        onnx.checker.check_model(onnx_model)
+        onnx.checker.check_model(onnx_model, full_check=True)
         if self.config.onnx.simplify:
             self.logger.info("Try to simplify ONNX model")
             onnxslim.slim(
@@ -97,7 +96,3 @@ class ONNXExporter(BaseExporter):
             )
             self.logger.info("Simplification successfully done")
         self.logger.info(f"ONNX model successfully stored in: {self.onnx_path}")
-
-    def register_onnx_plugins(self):
-        raise NotImplementedError("This method doesn't implemented, your should create him in custom class, "
-                                  "based on ExtendExporter")

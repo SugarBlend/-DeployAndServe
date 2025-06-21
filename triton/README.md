@@ -15,9 +15,9 @@
 - Build the correct folder hierarchy in the Triton model repository:  
 models/  
 ├── your_model_name/   
-├── 1/   
-├─── model.plan  
-└── config.pbtxt  
+│   ├── 1/   
+│   │   └── model.plan  
+│   └── config.pbtxt  
 - Configure the `config.pbtxt` file (see [example](models/yolo_trt/config.pbtxt)) with:
   - Input/output tensor shapes
   - Dynamic batching settings (if needed)

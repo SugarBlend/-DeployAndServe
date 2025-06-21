@@ -1,9 +1,8 @@
-from pathlib import Path
-from typing import Any, List, Optional, Sequence, Tuple, Union
-
 import numpy as np
 import onnxruntime as ort
+from pathlib import Path
 import torch
+from typing import Any, List, Optional, Sequence, Tuple, Union
 
 from deployment.core.executors.base import BaseExecutor, ExportConfig
 
@@ -11,7 +10,7 @@ from deployment.core.executors.base import BaseExecutor, ExportConfig
 class ORTExecutor(BaseExecutor):
     def __init__(self, config: ExportConfig) -> None:
         super(ORTExecutor, self).__init__(config)
-
+        ort.preload_dlls()
         sess_options = ort.SessionOptions()
         sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL

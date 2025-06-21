@@ -19,37 +19,11 @@ class TorchScriptExporter(BaseExporter):
 
         self.traced_model: Optional[torch.jit.ScriptModule] = None
 
-    def export(self) -> None:
-        if os.path.exists(self.torchscript_path) and not self.config.torchscript.force_rebuild:
-            return
-
-        self.logger.info("Try to convert PyTorch model to TorchScript format")
-        model = deepcopy(self.model)
-        device = torch.device(self.config.device)
-        for p in model.parameters():
-            p.required_grad = False
-        model.eval()
-        model.to(device)
-        model.float()
-
-        placeholder = torch.ones((1, 3, *self.config.input_shape), dtype=torch.float32, device=device)
-        for _ in range(2):
-            model(placeholder)
-        self.traced_model = torch.jit.trace(model, placeholder, strict=False)
-        if self.config.torchscript.optimize:
-            try:
-                self.logger.info(f"Try optimize traced model")
-                self.traced_model = torch.jit.optimize_for_inference(self.traced_model)
-                self.logger.info(f"TorchScript model successfully optimized")
-            except Exception as error:
-                self.logger.critical(error)
-        self.traced_model.save(self.torchscript_path)
-        self.logger.info(f"TorchScript model successfully stored in: {self.torchscript_path}")
-
-
     def benchmark(self) -> None:
-        placeholder = torch.ones((1, 3, *self.config.input_shape), dtype=torch.float32, device=self.config.device)
+        self.logger.info(f"Start benchmark of model: {self.torchscript_path}")
 
+        layer_info = next(self.model.parameters())
+        placeholder = torch.ones((1, 3, *self.config.input_shape), dtype=layer_info.dtype, device=layer_info.device)
         timings: List[float] = []
         start = torch.cuda.Event(enable_timing=True)
         end = torch.cuda.Event(enable_timing=True)
@@ -72,3 +46,24 @@ class TorchScriptExporter(BaseExporter):
         self.logger.info(f"[{shape}] Max latency: {max(timings):.2f} ms")
         self.logger.info(f"[{shape}] Std latency: {stdev(timings):.2f} ms")
         self.logger.info(f"[{shape}] Average throughput: {1000 / avg_time:.2f} FPS")
+
+    def export(self) -> None:
+        if os.path.exists(self.torchscript_path) and not self.config.torchscript.force_rebuild:
+            return
+
+        self.logger.info("Try convert PyTorch model to TorchScript format")
+        model = deepcopy(self.model)
+        layer_info = next(model.parameters())
+        placeholder = torch.ones((1, 3, *self.config.input_shape), dtype=layer_info.dtype, device=layer_info.device)
+        for _ in range(2):
+            model(placeholder)
+        self.traced_model = torch.jit.trace(model, placeholder, strict=False)
+        if self.config.torchscript.optimize:
+            try:
+                self.logger.info(f"Try optimize traced model")
+                self.traced_model = torch.jit.optimize_for_inference(self.traced_model)
+                self.logger.info(f"TorchScript model successfully optimized")
+            except Exception as error:
+                self.logger.critical(error)
+        self.traced_model.save(self.torchscript_path)
+        self.logger.info(f"TorchScript model successfully stored in: {self.torchscript_path}")

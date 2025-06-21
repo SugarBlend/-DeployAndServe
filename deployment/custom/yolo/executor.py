@@ -1,5 +1,5 @@
 import os.path
-from typing import Tuple, List, Optional
+from typing import Tuple, List
 
 import cv2
 import numpy as np
@@ -36,6 +36,10 @@ class YoloExecutor(ExtendExecutor):
         preprocessed = torch.from_numpy(self.letterbox(image=image)).to(self.config.device)
         preprocessed = preprocessed.permute(2, 0, 1)
         preprocessed = preprocessed / 255.0
+        if self.config.enable_mixed_precision:
+            preprocessed = preprocessed.half()
+        else:
+            preprocessed = preprocessed.float()
         return preprocessed[None]
 
     def postprocess(self, output: torch.Tensor, orig_shape) -> Tuple[List[np.ndarray], List[np.ndarray], List[np.ndarray]]:

@@ -3,6 +3,7 @@ formats:
   - torchscript
   - onnx
   - tensorrt
+enable_mixed_precision: true
 input_shape: [384, 640]
 device: cuda:0
 repeats: 1000

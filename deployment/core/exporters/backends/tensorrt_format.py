@@ -31,6 +31,7 @@ class TensorRTExporter(BaseExporter):
         import tensorrt as trt
         from deployment.core.executors.backends.tensrt import TensorRTExecutor
 
+        self.logger.info(f"Start benchmark of model: {self.engine_path}")
         bindings, binding_address, context = TensorRTExecutor.load(
             self.engine_path, self.config.tensorrt.specific.profile_shapes[0]["max"][0], self.config.device,
             trt.Logger.ERROR
@@ -77,7 +78,7 @@ class TensorRTExporter(BaseExporter):
         if os.path.exists(self.engine_path) and not self.config.tensorrt.force_rebuild:
             return
 
-        self.logger.info("Try to convert ONNX model to TensorRT engine")
+        self.logger.info("Try convert ONNX model to TensorRT engine")
         Path(self.engine_path).parent.mkdir(parents=True, exist_ok=True)
         if not os.path.exists(self.config.onnx.output_file):
             raise FileNotFoundError(f"Onnx model is not found by this way: {self.config.onnx.output_file}")

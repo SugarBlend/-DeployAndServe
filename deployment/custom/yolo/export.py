@@ -1,6 +1,7 @@
 from pathlib import Path
-from typing import Union
+from typing import Union, Optional
 import numpy as np
+import torch
 import tensorrt as trt
 from ultralytics import YOLO
 
@@ -8,6 +9,7 @@ from deployment.core.exporters.factory import Exporter
 from deployment.custom.yolo.model import WrappedModel, Model
 from deployment.models.export import ExportConfig
 from deployment.models.export.common import Plugin
+from contextlib import contextmanager
 
 
 class YoloExporter(Exporter):
@@ -21,6 +23,32 @@ class YoloExporter(Exporter):
         else:
             cls = Model
         self.model = cls(self.model)
+
+        device = torch.device(self.config.device)
+        for p in self.model.parameters():
+            p.required_grad = False
+        self.model.eval()
+        self.model.to(device)
+        if self.config.enable_mixed_precision:
+            self.model.half()
+        else:
+            self.model.float()
+
+        @contextmanager
+        def arange_patch():
+            if self.config.enable_mixed_precision:
+                func = torch.arange
+
+                def arange(*args, dtype: Optional[torch.dtype] = None, **kwargs) -> torch.Tensor:
+                    return func(*args, **kwargs).to(dtype)
+
+                torch.arange = arange
+                yield
+                torch.arange = func
+            else:
+                yield
+
+        self.onnx_patch = arange_patch
 
     def register_tensorrt_plugins(self, network: trt.INetworkDefinition) -> trt.INetworkDefinition:
         available_plugins = {

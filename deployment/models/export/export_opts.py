@@ -12,6 +12,8 @@ from deployment.models.export.torchscript_opts import TorchScriptConfig
 
 
 class ExportConfig(BaseModel):
+    enable_mixed_precision: bool = Field(default=True, description="Enable convert Pytorch model to fp16 precision "
+                                                                   "before launch export steps.")
     formats: List[Backend] = Field(default=["onnx", "tensorrt"], description="Steps for deployment pipeline.")
     input_shape: Tuple[int, int] = Field(description="Shapes for optimization and transfer.")
     device: str = Field(default="cuda:0", description="Device backend.")

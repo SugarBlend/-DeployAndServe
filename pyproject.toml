@@ -24,6 +24,7 @@ mmcv = {version = "2.2.0", source="mmcv_prebuilt"}
 opencv-python = ">=4.8.1.78"
 opencv-contrib-python = ">=4.8.1.78"
 openvino = "2025.2.0"
+colorlog = "6.9.0"
 
 [tool.poetry.group.formatting.dependencies]
 black = ">=25.1.0"
