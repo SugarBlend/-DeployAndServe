@@ -7,7 +7,6 @@ import numpy as np
 import onnx
 import onnxslim
 import torch
-import warnings
 
 from deployment.core.exporters.base import BaseExporter, ExportConfig
 from utils.logger import get_logger

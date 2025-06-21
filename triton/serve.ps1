@@ -1,0 +1,1 @@
+docker-compose -f ./triton/docker/docker-compose.yaml up -d --build

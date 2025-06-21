@@ -41,10 +41,15 @@ class YoloExecutor(ExtendExecutor):
     def postprocess(self, output: torch.Tensor, orig_shape) -> Tuple[List[np.ndarray], List[np.ndarray], List[np.ndarray]]:
         available_plugins = ["efficient_nms", "batched_nms"]
 
-        plugin: Optional[Plugin] = None
+        plugin: List[Plugin] = []
+        backend_conf = getattr(self.config, self.backend)
+        if hasattr(backend_conf, "plugins"):
+            plugins = backend_conf.plugins
+        else:
+            plugins = []
+
         for search_plugin in available_plugins:
-            plugin = next((plugin for plugin in getattr(self.config, self.backend).plugins
-                           if plugin.name == search_plugin), None)
+            plugin = next((plugin for plugin in plugins if plugin.name == search_plugin), [])
             if plugin:
                 break
 

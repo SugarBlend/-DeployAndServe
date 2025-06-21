@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Type, Optional
 
 from deployment.core.executors import BaseExecutor, ORTExecutor, TensorRTExecutor
+from deployment.core.executors.backends.openvinort import OpenVINORTExecutor
+from deployment.core.executors.backends.torchscript import TorchScriptExecutor
 from deployment.models.export import Backend, ExportConfig
 from utils.logger import get_logger
 
@@ -45,8 +47,10 @@ class ExtendExecutor(ABC):
 
 class ExecutorFactory(object):
     _executors: Dict[Backend, Type[BaseExecutor]] = {
+        Backend.TorchScript: TorchScriptExecutor,
         Backend.ONNX: ORTExecutor,
         Backend.TensorRT: TensorRTExecutor,
+        Backend.OpenVINO: OpenVINORTExecutor
     }
 
     @classmethod
