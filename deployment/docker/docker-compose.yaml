@@ -21,7 +21,7 @@ services:
             - driver: nvidia
               device_ids:
                 - "0"
-              capabilities: [gpu]
+              capabilities: [ gpu ]
     volumes:
       - ../../deployment/weights:/app/deployment/weights
       - ../../deployment/custom:/app/deployment/custom

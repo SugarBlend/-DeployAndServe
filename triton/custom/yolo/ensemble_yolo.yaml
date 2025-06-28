@@ -1,0 +1,8 @@
+fastapi:
+  host: 127.0.0.1
+  port: 5001
+triton:
+  host: 127.0.0.1
+  port: 8001
+protocol: grpc
+server: triton.custom.yolo.yolo:EnsembleYoloTriton

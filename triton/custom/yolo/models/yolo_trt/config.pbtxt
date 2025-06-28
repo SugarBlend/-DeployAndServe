@@ -1,0 +1,50 @@
+name: "yolo_trt"
+platform: "tensorrt_plan"
+max_batch_size: 4
+
+input {
+  name: "images",
+  data_type: TYPE_FP16,
+  dims: [ 3, 384, 640 ]
+}
+
+output {
+  name: "output",
+  data_type: TYPE_FP16,
+  dims: [ 84, 5040 ]
+}
+
+dynamic_batching {
+  preferred_batch_size: 4,
+  max_queue_delay_microseconds: 16000
+}
+
+instance_group [
+  {
+    name: "yolo_trt"
+    kind: KIND_GPU
+    count: 1
+    gpus: [ 0 ]
+  }
+]
+
+parameters: { key: "FORCE_CPU_ONLY_INPUT_TENSORS", value: { string_value: "no" } }
+optimization {
+  priority: PRIORITY_DEFAULT,
+  input_pinned_memory: {
+    enable: false
+  },
+  output_pinned_memory: {
+    enable: false
+  },
+  cuda {
+    graphs: true
+  },
+  execution_accelerators {
+    gpu_execution_accelerator: {
+      name: "tensorrt",
+      parameters { key: "precision_mode", value: "FP16" },
+      parameters { key: "max_workspace_size_bytes", value: "268435456" }
+    }
+  }
+}

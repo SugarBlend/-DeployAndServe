@@ -30,15 +30,13 @@ class ServiceConfig(BaseModel):
     triton: Url = Field(description="Url for connection to triton container server.")
     protocol: ProtocolType = Field(description="Triton network protocol type.")
     server: str = Field(description="Importlib path for triton class definition.")
-    show: bool = Field(default=False, description="Enable visualization of results.")
-    visualize: str = Field(description="Importlib path for visualization function.")
 
     @classmethod
     def from_file(cls, path: str) -> "ServiceConfig":
         if path.endswith(".json"):
             with open(path, "r", encoding="utf-8") as file:
                 data = json.load(file)
-        elif path.endswith(".yml"):
+        elif path.endswith(".yml") or path.endswith(".yaml"):
             with open(path, "r", encoding="utf-8") as file:
                 data = yaml.safe_load(file)
         else:

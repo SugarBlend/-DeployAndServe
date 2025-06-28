@@ -1,1 +1,1 @@
-docker-compose -f ./triton/docker/docker-compose.yaml up -d --build
+docker-compose -f ./triton/custom/yolo/docker/docker-compose.yaml up -d --build

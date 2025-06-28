@@ -8,7 +8,5 @@
     "port": 8001
   },
   "protocol": "grpc",
-  "server": "triton.custom.yolo.yolo:YoloTriton",
-  "show": true,
-  "visualize": "triton.custom.yolo.yolo:visualize"
+  "server": "module:class_name"
 }

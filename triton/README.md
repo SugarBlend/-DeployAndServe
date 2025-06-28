@@ -18,11 +18,11 @@ models/
 │   ├── 1/   
 │   │   └── model.plan  
 │   └── config.pbtxt  
-- Configure the `config.pbtxt` file (see [example](models/yolo_trt/config.pbtxt)) with:
+- Configure the `config.pbtxt` file (see [example](custom/yolo/models/yolo_trt/config.pbtxt)) with:
   - Input/output tensor shapes
   - Dynamic batching settings (if needed)
   - GPU acceleration preferences
 
 ### 4. Launch containers
 It is necessary to copy the weights generated after export and put them in the   
-[triton/models](./models) folder, then run the [serve.ps1](./serve.ps1) file.
+[triton/models](./custom/yolo/models) folder, then run the [serve.ps1](./serve.ps1) file.

@@ -2,11 +2,22 @@ import cv2
 import numpy as np
 from mmcv.visualization.image import imshow_det_bboxes
 import torch
-from typing import Any, List, Tuple, Optional
+from typing import Any, List, Tuple, Optional, Dict
 from ultralytics.data.augment import LetterBox
 from ultralytics.utils.ops import non_max_suppression, scale_boxes
 
 from triton.base import TritonRemote, ProtocolType
+
+
+class EnsembleYoloTriton(TritonRemote):
+    def __init__(self, url: str, model_name: str, protocol: ProtocolType) -> None:
+        super(EnsembleYoloTriton, self).__init__(url, model_name, protocol)
+
+    def preprocess(self, *args, **kwargs) -> Any:
+        pass
+
+    def postprocess(self, *args, **kwargs) -> Any:
+        pass
 
 
 class YoloTriton(TritonRemote):
@@ -30,28 +41,20 @@ class YoloTriton(TritonRemote):
         preprocessed = preprocessed / 255.0
         return [preprocessed[None]]
 
-    def postprocess(self, output: np.ndarray) -> Any:
-
-        boxes: List[np.ndarray] = []
-        classes: List[np.ndarray] = []
-        scores: List[np.ndarray] = []
-
+    def postprocess(self, output: np.ndarray) -> Dict[str, List[Any]]:
         output = torch.from_numpy(output[0]).cuda()
         detections = non_max_suppression(output)[0]
-        boxes.append(scale_boxes(self.model_shape, detections[:, :4], self.input_shape).cpu().numpy())
-        scores.append(detections[:, 4:5].reshape(-1, 1).cpu().numpy())
-        classes.append(detections[:, 5:].reshape(-1).to(torch.int).cpu().numpy())
+        boxes = scale_boxes(self.model_shape, detections[:, :4], self.input_shape).cpu().numpy()
+        scores = detections[:, 4:5].reshape(-1, 1).cpu().numpy()
+        classes = detections[:, 5:].reshape(-1).to(torch.int).cpu().numpy()
 
-        return boxes, scores, classes
+        return {"boxes": boxes.tolist(), "scores": scores.tolist(), "classes": classes.tolist()}
 
 
-def visualize(frame: np.ndarray, outputs: Tuple[List[np.ndarray], List[np.ndarray], List[np.ndarray]],
-              class_names: Optional[List[str]] = None, wait_time: int = 0):
-    boxes, scores, classes = outputs
+def visualize(frame: np.ndarray, outputs: Dict[str, List[Any]], class_names: Optional[List[str]] = None, wait_time: int = 0):
+    boxes, scores, classes = outputs.values()
     if len(boxes):
         cv2.namedWindow("triton", cv2.WINDOW_GUI_EXPANDED)
-        for idx in range(len(boxes)):
-            imshow_det_bboxes(frame, np.concatenate([boxes[idx], scores[idx]], axis=1), classes[idx],
-                              class_names, bbox_color=(0, 233, 255), text_color=(0, 233, 255), thickness=2,
-                              show=True, win_name="triton", wait_time=wait_time)
-
+        imshow_det_bboxes(frame, np.concatenate([boxes, scores], axis=1), np.array(classes),
+                          class_names, bbox_color=(0, 233, 255), text_color=(0, 233, 255), thickness=2,
+                          show=True, win_name="triton", wait_time=wait_time)

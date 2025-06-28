@@ -1,0 +1,47 @@
+name: "preprocess"
+backend: "python"
+max_batch_size: 4
+
+input [
+  {
+    name: "INPUT_0",
+    data_type: TYPE_UINT8,
+    dims: [ -1 ]
+  }
+]
+
+output [
+  {
+    name: "preprocessed_image",
+    data_type: TYPE_FP16,
+    dims: [ 3, -1, -1 ]
+  },
+  {
+    name: "input_shape",
+    data_type: TYPE_FP16,
+    dims: [ 2 ]
+  }
+]
+
+parameters: {
+  key: "max_queue_delay_microseconds"
+  value: { string_value: "1000000" }  # 1 секунда на сбор батча
+}
+
+instance_group [
+  {
+    kind: KIND_CPU,
+    count: 2  # Увеличить число инстансов для параллелизма
+  }
+]
+
+parameters: { key: "FORCE_CPU_ONLY_INPUT_TENSORS", value: { string_value: "no" } }
+
+#parameters: {
+#  key: "DISABLE_SHARED_MEMORY"
+#  value: { string_value: "1" }
+#}
+#parameters: {
+#  key: "cuda_shared_memory"
+#  value: { string_value: "1" }
+#}

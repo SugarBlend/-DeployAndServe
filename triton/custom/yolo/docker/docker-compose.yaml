@@ -3,21 +3,32 @@ version: '3.8'
 services:
   triton:
     container_name: triton
-    image: nvcr.io/nvidia/tritonserver:25.05-py3
+    image: extended_triton:latest
     ports:
       - 8000:8000
       - 8001:8001
       - 8002:8002
+    environment:
+      - DISPLAY=host.docker.internal:0.0
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
     restart: always
     volumes:
-      - ${PWD}/triton/models:/models
-    command: [ tritonserver, --model-store=/models, --exit-on-error=false, --model-control-mode=poll ]
+      - ${PWD}/triton/custom/yolo/models:/models
+    stdin_open: true
+    tty: true
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: bash -c "tritonserver --model-store=/models --exit-on-error=false --model-control-mode=poll --log-verbose=1 & tail -f /dev/null"
     deploy:
       resources:
         reservations:
           devices:
-            - capabilities: [ gpu ]
-              count: 1
+            - driver: nvidia
+              device_ids:
+                - "0"
+              capabilities: [gpu]
   prometheus:
     container_name: prometheus
     image: prom/prometheus:latest

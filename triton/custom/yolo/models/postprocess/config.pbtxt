@@ -1,0 +1,45 @@
+name: "postprocess"
+backend: "python"
+max_batch_size: 4
+
+input [
+  {
+    name: "INPUT__0",
+    data_type: TYPE_FP16,
+    dims: [ 84, 5040 ]
+  },
+  {
+    name: "INPUT__1",
+    data_type: TYPE_FP16,
+    dims: [ 2 ]
+  }
+]
+
+output [
+  {
+    name: "OUTPUT__0",
+    data_type: TYPE_FP16,
+    dims: [ 300, 6 ]
+  }
+]
+instance_group [
+  {
+    kind: KIND_GPU,
+    gpus: [0]
+  }
+]
+
+#parameters: {
+#  key: "FORCE_CPU_ONLY_INPUT_TENSORS"
+#  value: { string_value: "no" }
+#}
+
+#parameters: {
+#  key: "DISABLE_SHARED_MEMORY"
+#  value: { string_value: "1" }
+#}
+
+#parameters: {
+#  key: "cuda_shared_memory"
+#  value: { string_value: "1" }
+#}
