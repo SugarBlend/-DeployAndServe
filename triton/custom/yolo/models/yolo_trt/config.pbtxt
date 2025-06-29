@@ -1,6 +1,6 @@
 name: "yolo_trt"
 platform: "tensorrt_plan"
-max_batch_size: 4
+max_batch_size: 8
 
 input {
   name: "images",
@@ -32,10 +32,10 @@ parameters: { key: "FORCE_CPU_ONLY_INPUT_TENSORS", value: { string_value: "no" }
 optimization {
   priority: PRIORITY_DEFAULT,
   input_pinned_memory: {
-    enable: false
+    enable: true
   },
   output_pinned_memory: {
-    enable: false
+    enable: true
   },
   cuda {
     graphs: true

@@ -4,12 +4,12 @@ from functools import partial
 import numpy as np
 from queue import Queue, Empty
 from threading import Thread
-from typing import Union, Callable, List, Dict
+from typing import Dict, Union, Callable, List, Any
 import time
 
-from base_service import BaseService, collect_frames, parse_options, get_callable_from_string
 from triton.configs import ServiceConfig, Url, Formats, ProtocolType
 from triton.base import TritonRemote
+from base_service import BaseService, collect_frames, parse_options, get_callable_from_string
 
 
 class Service(BaseService):
@@ -22,13 +22,23 @@ class Service(BaseService):
     ) -> None:
         super(Service, self).__init__(inference_server_cls, fastapi, triton, protocol)
 
+    async def send_request(self, data: bytes) -> np.ndarray:
+        try:
+            buffer = np.frombuffer(data, np.uint8)
+            frame = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
+            tensors = self.inference_server.preprocess(frame)
+            result = await self.inference_server.infer(feed_input=tensors)
+            return self.inference_server.postprocess(result)
+        except Exception as error:
+            self.logger.error(error)
+
     async def send_requests(
             self,
             frame_queue: Queue[np.ndarray],
             thread_collector: Thread
-    ) -> Dict[int, List[List[np.ndarray]]]:
+    ) -> Dict[int, List[np.ndarray]]:
         tasks: List[asyncio.tasks.Task] = []
-        results: Dict[int, List[List[np.ndarray]]] = {}
+        results: Dict[int, List[np.ndarray]] = {}
         max_concurrently_tasks: int = 128
         counter: int = 0
 
@@ -40,12 +50,11 @@ class Service(BaseService):
                 try:
                     frame = frame_queue.get()
                     _, img_encoded = cv2.imencode(".jpg", frame)
-                    task = asyncio.create_task(self.inference_server.infer(feed_input=[np.stack([img_encoded])]))
-                    callback = partial(lambda c, t: results.update({c: t.result()[0].tolist()}), counter)
+                    task = asyncio.create_task(self.send_request(img_encoded.tobytes()))
+                    callback = partial(lambda c, t: results.update({c: t.result().tolist()}), counter)
                     task.add_done_callback(callback)
                     tasks.append(task)
                     counter += 1
-
                 except Empty:
                     await asyncio.sleep(0.01)
 
@@ -54,7 +63,7 @@ class Service(BaseService):
             tasks.clear()
         return results
 
-    async def request_manager(self, content_type: str, data: bytes) -> Dict[int, List[List[np.ndarray]]]:
+    async def request_manager(self, content_type: str, data: bytes) -> Dict[int, List[np.ndarray]]:
         media_type, container = content_type.split("/")
         if media_type == Formats.VIDEO:
             frame_queue = Queue(maxsize=256)
@@ -64,16 +73,15 @@ class Service(BaseService):
             collector_thread.join()
             return results
         elif media_type == Formats.IMAGE:
-            buffer = np.frombuffer(data, np.uint8)
-            result = await self.inference_server.infer(feed_input=[np.stack([buffer])])
+            result = await self.send_request(data)
             return {0: [result]}
         else:
-            raise NotImplementedError("Passed unsupported data type of file.")
+            raise NotImplementedError("Pass unsupported data type of file.")
 
 
 if __name__ == "__main__":
     args = parse_options()
-    args.service_config = "./custom/yolo/ensemble_yolo.yaml"
+    args.service_config = "./custom/yolo/yolo.yaml"
     config = ServiceConfig.from_file(args.service_config)
     service = Service(
         inference_server_cls=get_callable_from_string(config.server),

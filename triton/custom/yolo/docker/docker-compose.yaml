@@ -21,6 +21,7 @@ services:
       context: .
       dockerfile: Dockerfile
     command: bash -c "tritonserver --model-store=/models --exit-on-error=false --model-control-mode=poll --log-verbose=1 & tail -f /dev/null"
+    shm_size: 4gb
     deploy:
       resources:
         reservations:

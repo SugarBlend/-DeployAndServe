@@ -1,6 +1,6 @@
 name: "ensemble_yolo_trt"
 platform: "ensemble"
-max_batch_size: 4
+max_batch_size: 8
 
 input [
   {
