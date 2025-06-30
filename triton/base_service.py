@@ -5,8 +5,7 @@ import cv2
 from fastapi import FastAPI, File, UploadFile, Query
 from fastapi.responses import FileResponse, Response
 import pickle
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
-from prometheus_client import make_asgi_app, Summary, Counter
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest, make_asgi_app, Summary, Counter
 import os
 from queue import Queue
 from importlib import import_module
