@@ -1,8 +1,7 @@
 [project]
-name = "execution_samples"
+name = "deploy-and-serve"
 dynamic = ["version"]
 requires-python = ">=3.10"
-package-mode = false
 
 [tool.poetry]
 version = "0.1.0"
