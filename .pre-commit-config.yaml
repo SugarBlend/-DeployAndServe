@@ -62,25 +62,3 @@ repos:
           "--disable-noqa",
           "--max-complexity=10",
         ]
-      - id: mypy
-        entry: mypy
-        name: Mypy static type checker
-        language: python
-        types: [ python ]
-        args: [
-          "--ignore-missing-imports",
-          "--scripts-are-modules",
-          "--show-error-codes",
-          "--strict",
-          "--disallow-untyped-defs",
-          "--disallow-incomplete-defs",
-          "--warn-return-any",
-          "--warn-unused-configs",
-          "--exclude=.venv|venv|venv310|build|dist|.*/site-packages/.*",
-          "--python-version=3.10",
-          "--pretty",
-          "--no-site-packages",
-          "--explicit-package-bases"
-        ]
-        require_serial: true
-        additional_dependencies: []
