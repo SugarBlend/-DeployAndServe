@@ -17,8 +17,8 @@ import time
 import tempfile
 import uvicorn
 
-from triton.base_service import collect_frames
-from utils.logger import get_logger
+from deploy2serve.triton.base_service import collect_frames
+from deploy2serve.utils.logger import get_logger
 
 
 class Service(object):

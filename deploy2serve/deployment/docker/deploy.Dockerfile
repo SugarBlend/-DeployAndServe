@@ -3,7 +3,7 @@ FROM nvcr.io/nvidia/tritonserver:25.05-py3
 WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONPATH="/app:/app/deployment:/app/utils" \
+    PYTHONPATH="/app:/app/deploy2serve/deployment:/app/deploy2serve/utils" \
     VIRTUAL_ENV=/opt/venv \
     PATH="/opt/venv/bin:$PATH"
 
@@ -33,14 +33,14 @@ RUN apt-get update && \
 RUN /opt/venv/bin/python -m pip install --upgrade pip
 
 RUN /opt/venv/bin/pip install poetry
-RUN mkdir -p /app/deployment
+RUN mkdir -p /app/deploy2serve/deployment
 
 COPY pyproject.toml README.md ./
-COPY deployment/*.py deployment
-COPY deployment/core deployment/core
-COPY deployment/resources deployment/resources
-COPY deployment/models deployment/models
-COPY utils utils
+COPY deploy2serve/deployment/*.py deploy2serve/deployment
+COPY deploy2serve/deployment/core deploy2serve/deployment/core
+COPY resources resources
+COPY deploy2serve/deployment/models deploy2serve/deployment/models
+COPY deploy2serve/utils deploy2serve/utils
 
 RUN poetry config virtualenvs.create false && \
     poetry update

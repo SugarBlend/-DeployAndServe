@@ -1,1 +1,1 @@
-docker-compose -f ./torchserve/docker/docker-compose.yaml up -d --build
+docker-compose -f ./deploy2serve/torchserve/docker/docker-compose.yaml up -d --build

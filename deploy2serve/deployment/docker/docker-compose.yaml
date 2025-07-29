@@ -12,8 +12,8 @@ services:
     stdin_open: true
     tty: true
     build:
-      context: ../..
-      dockerfile: deployment/docker/deploy.Dockerfile
+      context: ../../../
+      dockerfile: deploy2serve/deployment/docker/deploy.Dockerfile
     deploy:
       resources:
         reservations:
@@ -23,5 +23,5 @@ services:
                 - "0"
               capabilities: [ gpu ]
     volumes:
-      - ../../deployment/weights:/app/deployment/weights
-      - ../../deployment/custom:/app/deployment/custom
+      - ../../../weights:/app/weights
+      - ../../../deploy2serve/deployment/overrides:/app/deploy2serve/deployment/overrides

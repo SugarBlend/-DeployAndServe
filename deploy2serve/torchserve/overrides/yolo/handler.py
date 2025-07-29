@@ -14,7 +14,7 @@ from ultralytics.data.augment import LetterBox
 from ultralytics.utils.ops import non_max_suppression, scale_boxes
 
 sys.path.insert(0, str(Path(os.environ["VIRTUAL_ENV"]).parent))
-from utils.logger import get_logger
+from deploy2serve.utils.logger import get_logger
 
 
 class YoloTorchServe(BaseHandler):

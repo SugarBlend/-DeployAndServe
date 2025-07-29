@@ -23,4 +23,4 @@ def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
 
 
 def get_project_root() -> Path:
-    return Path(__file__).parents[1]
+    return Path(__file__).parents[2]

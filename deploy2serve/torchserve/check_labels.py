@@ -1,4 +1,4 @@
-from triton.custom.yolo.yolo import check_labels
+from deploy2serve.triton.custom.yolo.yolo import check_labels
 
 
 if __name__ == "__main__":
