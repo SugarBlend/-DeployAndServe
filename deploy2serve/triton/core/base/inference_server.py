@@ -4,7 +4,7 @@ from copy import deepcopy
 from typing import Optional, List, Dict, Any, Union
 from tritonclient.utils import triton_to_np_dtype
 
-from triton.configs import ProtocolType
+from deploy2serve.triton.core.configs import ProtocolType
 
 
 class TritonRemote(ABC):

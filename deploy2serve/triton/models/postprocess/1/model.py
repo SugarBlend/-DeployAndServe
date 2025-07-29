@@ -1,7 +1,7 @@
 import numpy as np
 import json
 import torch
-import triton_python_backend_utils as pb_utils
+import triton_python_backend_utils as pb_utils  # type: ignore[attr-defined]
 from typing import Optional, Dict, Any, List, Tuple
 
 

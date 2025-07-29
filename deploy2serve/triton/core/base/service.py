@@ -8,20 +8,19 @@ import pickle
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest, make_asgi_app, Summary, Counter
 import os
 from queue import Queue
-from importlib import import_module
 from imutils.video import FileVideoStream
 from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException
 import tempfile
 from tqdm import tqdm
-from typing import Union, Callable, Optional, Type, Any
+from typing import Union, Callable, Optional, Any
 import time
 import uvicorn
 
-from triton.configs import Url, ProtocolType
-from triton.base import TritonRemote
-from utils.logger import get_logger
-from utils.runner import ServerRunner
+from deploy2serve.triton.core.configs import Url, ProtocolType
+from deploy2serve.triton.core.base.inference_server import TritonRemote
+from deploy2serve.utils.logger import get_logger
+from deploy2serve.utils.runner import ServerRunner
 
 
 def collect_frames(data: bytes, container: str, frame_queue: Queue) -> None:
@@ -126,12 +125,6 @@ class BaseService(ABC):
 
 def parse_options() -> Namespace:
     parser = ArgumentParser()
-    parser.add_argument("--service_config", default="./custom/yolo/ensemble_yolo.yaml",
-                        help="Path to service configuration.")
+    from deploy2serve.utils.logger import get_project_root
+    parser.add_argument("--service_config", default=f"{get_project_root()}/deploy2serve/triton/overrides/yolo/configs/ensemble.yaml", help="Path to service configuration.")
     return parser.parse_args()
-
-
-def get_callable_from_string(path: str) -> Type[Any]:
-    module_path, name = path.split(':')
-    module = import_module(module_path)
-    return getattr(module, name)

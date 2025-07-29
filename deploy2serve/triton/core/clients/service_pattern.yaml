@@ -5,6 +5,6 @@ triton:
   host: 127.0.0.1
   port: 8001
 protocol: grpc
-server: triton.custom.yolo.client.yolo:YoloTriton
-show: true
-visualize: module:class_name
+server:
+  module: module_name
+  cls: class_name

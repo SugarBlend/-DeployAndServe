@@ -2,7 +2,7 @@ from argparse import ArgumentParser, Namespace
 from importlib import import_module
 from typing import Callable
 from pathlib import Path
-from models.export import ExportConfig
+from deploy2serve.deployment.models.export import ExportConfig
 
 from deploy2serve.utils.logger import get_project_root
 

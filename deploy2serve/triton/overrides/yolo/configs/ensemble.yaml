@@ -5,4 +5,6 @@ triton:
   host: 127.0.0.1
   port: 8001
 protocol: grpc
-server: triton.custom.yolo.yolo:EnsembleYoloTriton
+server:
+  module: deploy2serve.triton.overrides.yolo.server
+  cls: EnsembleYoloTriton

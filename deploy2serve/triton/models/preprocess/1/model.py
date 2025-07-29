@@ -2,7 +2,7 @@ import numpy as np
 import json
 import io
 from PIL import Image
-import triton_python_backend_utils as pb_utils
+import triton_python_backend_utils as pb_utils  # type: ignore[attr-defined]
 import torch
 from typing import List, Dict, Tuple, Any, Optional
 

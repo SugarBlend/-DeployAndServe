@@ -34,8 +34,8 @@ This repository only includes functionality for converting PyTorch models to the
 - ✅ ONNX  
 - ✅ TorchScript  
 - ✅ TensorRT  
-- ✅ OpenVINO  
-- 
+- ✅ OpenVINO
+
 Model loading logic is expected to be provided by the user.
 
 ---

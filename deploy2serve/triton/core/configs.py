@@ -25,11 +25,16 @@ class Url(BaseModel):
         return f"{self.host}:{self.port}"
 
 
+class OverrideFunctionality(BaseModel):
+    module: str = Field(description="Way to module which consider override class.")
+    cls: str = Field(description="Class which consist of overrides under basic functionality.")
+
+
 class ServiceConfig(BaseModel):
     fastapi: Url = Field(description="Url for creation fastapi user server.")
     triton: Url = Field(description="Url for connection to triton container server.")
     protocol: ProtocolType = Field(description="Triton network protocol type.")
-    server: str = Field(description="Importlib path for triton class definition.")
+    server: OverrideFunctionality  = Field(description="Module and class which implements server logic.")
 
     @classmethod
     def from_file(cls, path: str) -> "ServiceConfig":

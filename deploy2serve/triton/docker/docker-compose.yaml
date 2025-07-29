@@ -14,7 +14,7 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
     restart: always
     volumes:
-      - ${PWD}/triton/custom/yolo/models:/models
+      - ${PWD}/deploy2serve/triton/models:/models
     stdin_open: true
     tty: true
     build:

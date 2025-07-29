@@ -1,15 +1,15 @@
 import asyncio
+
 import cv2
 from functools import partial
 import numpy as np
 from queue import Queue, Empty
 from threading import Thread
 from typing import Union, Callable, List, Dict
-import time
 
-from base_service import BaseService, collect_frames, parse_options, get_callable_from_string
-from triton.configs import ServiceConfig, Url, Formats, ProtocolType
-from triton.base import TritonRemote
+from deploy2serve.triton.core.base.service import BaseService, collect_frames
+from deploy2serve.triton.core.configs import Url, Formats, ProtocolType
+from deploy2serve.triton.core.base.inference_server import TritonRemote
 
 
 class Service(BaseService):
@@ -69,17 +69,3 @@ class Service(BaseService):
             return {0: [result]}
         else:
             raise NotImplementedError("Passed unsupported data type of file.")
-
-
-if __name__ == "__main__":
-    args = parse_options()
-    args.service_config = "./custom/yolo/ensemble_yolo.yaml"
-    config = ServiceConfig.from_file(args.service_config)
-    service = Service(
-        inference_server_cls=get_callable_from_string(config.server),
-        fastapi=config.fastapi,
-        triton=config.triton,
-        protocol=config.protocol
-    )
-    while service.runner.thread.is_alive():
-        time.sleep(0.1)

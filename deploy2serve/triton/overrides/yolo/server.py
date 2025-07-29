@@ -1,15 +1,16 @@
-import os
-
 import cv2
 import numpy as np
-from mmcv.visualization.image import imshow_det_bboxes
+from importlib import import_module
 import torch
+import time
 from typing import Any, List, Tuple, Optional
 from ultralytics.data.augment import LetterBox
 from ultralytics.utils.ops import non_max_suppression, scale_boxes
 
-from triton.base import TritonRemote, ProtocolType
-from utils.containers import is_image_file, is_video_file
+from deploy2serve.triton.core.base.inference_server import TritonRemote, ProtocolType
+from deploy2serve.triton.core.base.service import parse_options
+from deploy2serve.triton.core.configs import ServiceConfig
+
 
 class EnsembleYoloTriton(TritonRemote):
     def __init__(self, url: str, model_name: str, protocol: ProtocolType) -> None:
@@ -22,9 +23,9 @@ class EnsembleYoloTriton(TritonRemote):
         pass
 
 
-class YoloTriton(TritonRemote):
+class RegularYoloTriton(TritonRemote):
     def __init__(self, url: str, model_name: str, protocol: ProtocolType) -> None:
-        super(YoloTriton, self).__init__(url, model_name, protocol)
+        super(RegularYoloTriton, self).__init__(url, model_name, protocol)
         self.vis_frame: Optional[np.ndarray] = None
         self.letterbox: Optional[LetterBox] = None
         self.model_shape: Optional[Tuple[int, int]] = None
@@ -52,36 +53,19 @@ class YoloTriton(TritonRemote):
         return np.concatenate([boxes, scores, classes], axis=1)
 
 
-def plot(frame: np.ndarray, outputs: np.ndarray, class_names: Optional[List[str]] = None, wait_time: int = 0):
-    if len(outputs):
-        cv2.namedWindow("triton", cv2.WINDOW_GUI_EXPANDED)
-        imshow_det_bboxes(frame, outputs[:, :5], outputs[:, 5],
-                          class_names, bbox_color=(0, 233, 255), text_color=(0, 233, 255), thickness=2,
-                          show=True, win_name="triton", wait_time=wait_time)
-
-
-def check_labels(source_path: str, labels: str) -> None:
-    import pickle
-    with open(labels, "rb") as file:
-        detections = pickle.load(file)
-
-    if is_video_file(source_path):
-        from tqdm import trange
-        from imutils.video import FileVideoStream
-        cap = FileVideoStream(source_path)
-        cap.start()
-        frames_number = int(cap.stream.get(cv2.CAP_PROP_FRAME_COUNT))
-        for i in trange(frames_number, desc="Read frames"):
-            frame = cap.read()
-            if frame is None:
-                break
-            plot(frame, np.array(detections[i]).reshape(-1, 6), wait_time=10)
-    elif is_image_file(source_path):
-        frame = cv2.imread(source_path)
-        plot(frame, np.array(detections[0]).reshape(-1, 6), wait_time=0)
-    else:
-        raise NotImplementedError
-
 if __name__ == "__main__":
-    check_labels("../../resources/cup.mp4", "../../resources/cup.pickle")
-    check_labels("../../resources/demo.jpg", "../../resources/demo.pickle")
+    args = parse_options()
+
+    if 'ensemble' in args.service_config:
+        from deploy2serve.triton.core.clients.ensemble import Service
+    elif 'regular' in args.service_config:
+        from deploy2serve.triton.core.clients.ensemble import Service
+    else:
+        raise Exception("Configuration file of service must have word 'ensemble' of 'regular' in name of file "
+                        "for correct launch.")
+
+    config = ServiceConfig.from_file(args.service_config)
+    cls = getattr(import_module(config.server.module), config.server.cls)
+    service = Service(cls, config.fastapi, config.triton, config.protocol)
+    while service.runner.thread.is_alive():
+        time.sleep(0.1)

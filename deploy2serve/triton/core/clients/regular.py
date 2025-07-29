@@ -4,12 +4,11 @@ from functools import partial
 import numpy as np
 from queue import Queue, Empty
 from threading import Thread
-from typing import Dict, Union, Callable, List, Any
-import time
+from typing import Dict, Union, Callable, List
 
-from triton.configs import ServiceConfig, Url, Formats, ProtocolType
-from triton.base import TritonRemote
-from base_service import BaseService, collect_frames, parse_options, get_callable_from_string
+from deploy2serve.triton.core.configs import Url, Formats, ProtocolType
+from deploy2serve.triton.core.base.inference_server import TritonRemote
+from deploy2serve.triton.core.base.service import BaseService, collect_frames
 
 
 class Service(BaseService):
@@ -77,17 +76,3 @@ class Service(BaseService):
             return {0: [result]}
         else:
             raise NotImplementedError("Pass unsupported data type of file.")
-
-
-if __name__ == "__main__":
-    args = parse_options()
-    args.service_config = "./custom/yolo/yolo.yaml"
-    config = ServiceConfig.from_file(args.service_config)
-    service = Service(
-        inference_server_cls=get_callable_from_string(config.server),
-        fastapi=config.fastapi,
-        triton=config.triton,
-        protocol=config.protocol
-    )
-    while service.runner.thread.is_alive():
-        time.sleep(0.1)
