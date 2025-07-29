@@ -1,0 +1,10 @@
+fastapi:
+  host: 127.0.0.1
+  port: 5001
+triton:
+  host: 127.0.0.1
+  port: 8001
+protocol: grpc
+server:
+  module: module_name
+  cls: class_name

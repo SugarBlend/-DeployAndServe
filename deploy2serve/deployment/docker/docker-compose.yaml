@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  export:
+    container_name: deployer
+    image: deployer
+    environment:
+      - DISPLAY=host.docker.internal:0.0
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+    command: tail -f /dev/null
+    stdin_open: true
+    tty: true
+    build:
+      context: ../../../
+      dockerfile: deploy2serve/deployment/docker/deploy.Dockerfile
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids:
+                - "0"
+              capabilities: [ gpu ]
+    volumes:
+      - ../../../weights:/app/weights
+      - ../../../deploy2serve/deployment/overrides:/app/deploy2serve/deployment/overrides

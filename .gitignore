@@ -61,6 +61,10 @@ dmypy.json
 # idea
 .idea
 # Models
+*.bin
+*.cache
+*.xml
+*.plan
 *.onnx
 *.tflite
 *.engine

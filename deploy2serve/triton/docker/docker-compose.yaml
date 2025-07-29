@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  triton:
+    container_name: triton
+    image: extended_triton:latest
+    ports:
+      - 8000:8000
+      - 8001:8001
+      - 8002:8002
+    environment:
+      - DISPLAY=host.docker.internal:0.0
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+    restart: always
+    volumes:
+      - ${PWD}/deploy2serve/triton/models:/models
+    stdin_open: true
+    tty: true
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: bash -c "tritonserver --model-store=/models --exit-on-error=false --model-control-mode=poll --log-verbose=1 & tail -f /dev/null"
+    shm_size: 4gb
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids:
+                - "0"
+              capabilities: [gpu]
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:latest
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    restart: always
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:latest
+    ports:
+      - 3000:3000
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+    restart: always
