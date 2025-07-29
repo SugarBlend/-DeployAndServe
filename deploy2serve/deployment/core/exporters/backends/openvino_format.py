@@ -1,11 +1,12 @@
-from copy import deepcopy
 import os
-import numpy as np
+import time
+from copy import deepcopy
 from pathlib import Path
 from statistics import stdev
-import time
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
 import torch
-from typing import List, Tuple, Dict, Optional
 
 from deploy2serve.deployment.core.exporters.base import BaseExporter, ExportConfig
 from deploy2serve.deployment.models.export import Precision
@@ -37,7 +38,7 @@ class OpenVINOExporter(BaseExporter):
         for _ in range(self.config.repeats):
             start_time = time.perf_counter()
             compiled_model(placeholder)
-            timings.append((time.perf_counter() - start_time) * 1000 )
+            timings.append((time.perf_counter() - start_time) * 1000)
         avg_time = np.mean(timings)
         shape = "x".join(list(map(str, placeholder.shape)))
 
@@ -54,7 +55,7 @@ class OpenVINOExporter(BaseExporter):
 
         self.logger.info("Try convert PyTorch model to OpenVINO model")
         model = deepcopy(self.model)
-        options: Optional[Dict[str, Tuple[Tuple[int, ...],ov.Type]]] = None
+        options: Optional[Dict[str, Tuple[Tuple[int, ...], ov.Type]]] = None
         layer_info = next(model.parameters())
         dummy_input = torch.zeros((1, 3, *self.config.input_shape), dtype=layer_info.dtype, device=layer_info.device)
         for _ in range(10):

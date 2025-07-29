@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 from typing import Generator, List, Optional
+
 import tensorrt as trt
 import torch
 from tqdm import tqdm

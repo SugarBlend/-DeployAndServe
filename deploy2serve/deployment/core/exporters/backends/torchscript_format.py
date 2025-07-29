@@ -1,10 +1,11 @@
-import torch.jit
 import os
 from copy import deepcopy
-import numpy as np
 from pathlib import Path
 from statistics import stdev
 from typing import List, Optional
+
+import numpy as np
+import torch.jit
 
 from deploy2serve.deployment.core.exporters.base import BaseExporter, ExportConfig
 from deploy2serve.utils.logger import get_logger, get_project_root
@@ -62,9 +63,9 @@ class TorchScriptExporter(BaseExporter):
         self.traced_model = torch.jit.trace(model, placeholder, strict=False)
         if self.config.torchscript.optimize:
             try:
-                self.logger.info(f"Try optimize traced model")
+                self.logger.info("Try optimize traced model")
                 self.traced_model = torch.jit.optimize_for_inference(self.traced_model)
-                self.logger.info(f"TorchScript model successfully optimized")
+                self.logger.info("TorchScript model successfully optimized")
             except Exception as error:
                 self.logger.critical(error)
         self.traced_model.save(self.torchscript_path)

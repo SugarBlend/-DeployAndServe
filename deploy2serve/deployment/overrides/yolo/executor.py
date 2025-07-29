@@ -1,5 +1,5 @@
 import os.path
-from typing import Tuple, List
+from typing import List, Tuple
 
 import cv2
 import numpy as np
@@ -19,16 +19,86 @@ class YoloExecutor(ExtendExecutor):
         super(YoloExecutor, self).__init__(config)
         self.letterbox = LetterBox(new_shape=self.config.input_shape)
         self.class_names = [
-            "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck",
-            "boat", "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat",
-            "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe",
-            "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard",
-            "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", "bottle",
-            "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple",
-            "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake",
-            "chair", "couch", "potted plant", "bed", "dining table", "toilet", "tv", "laptop",
-            "mouse", "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink",
-            "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush",
+            "person",
+            "bicycle",
+            "car",
+            "motorcycle",
+            "airplane",
+            "bus",
+            "train",
+            "truck",
+            "boat",
+            "traffic light",
+            "fire hydrant",
+            "stop sign",
+            "parking meter",
+            "bench",
+            "bird",
+            "cat",
+            "dog",
+            "horse",
+            "sheep",
+            "cow",
+            "elephant",
+            "bear",
+            "zebra",
+            "giraffe",
+            "backpack",
+            "umbrella",
+            "handbag",
+            "tie",
+            "suitcase",
+            "frisbee",
+            "skis",
+            "snowboard",
+            "sports ball",
+            "kite",
+            "baseball bat",
+            "baseball glove",
+            "skateboard",
+            "surfboard",
+            "tennis racket",
+            "bottle",
+            "wine glass",
+            "cup",
+            "fork",
+            "knife",
+            "spoon",
+            "bowl",
+            "banana",
+            "apple",
+            "sandwich",
+            "orange",
+            "broccoli",
+            "carrot",
+            "hot dog",
+            "pizza",
+            "donut",
+            "cake",
+            "chair",
+            "couch",
+            "potted plant",
+            "bed",
+            "dining table",
+            "toilet",
+            "tv",
+            "laptop",
+            "mouse",
+            "remote",
+            "keyboard",
+            "cell phone",
+            "microwave",
+            "oven",
+            "toaster",
+            "sink",
+            "refrigerator",
+            "book",
+            "clock",
+            "vase",
+            "scissors",
+            "teddy bear",
+            "hair drier",
+            "toothbrush",
         ]
 
     def preprocess(self, image: np.ndarray) -> torch.Tensor:
@@ -42,7 +112,9 @@ class YoloExecutor(ExtendExecutor):
             preprocessed = preprocessed.float()
         return preprocessed[None]
 
-    def postprocess(self, output: torch.Tensor, orig_shape) -> Tuple[List[np.ndarray], List[np.ndarray], List[np.ndarray]]:
+    def postprocess(
+        self, output: torch.Tensor, orig_shape
+    ) -> Tuple[List[np.ndarray], List[np.ndarray], List[np.ndarray]]:
         available_plugins = ["efficient_nms", "batched_nms"]
 
         plugin: List[Plugin] = []
@@ -92,6 +164,14 @@ class YoloExecutor(ExtendExecutor):
         boxes, scores, classes = self.postprocess(output, image.shape[:2])
         if len(boxes):
             for idx in range(tensor.shape[0]):
-                imshow_det_bboxes(image, np.concatenate([boxes[idx], scores[idx]], axis=1), classes[idx],
-                                  self.class_names, bbox_color=(0, 233, 255), text_color=(0, 233, 255), thickness=2,
-                                  show=True, win_name=self.backend)
+                imshow_det_bboxes(
+                    image,
+                    np.concatenate([boxes[idx], scores[idx]], axis=1),
+                    classes[idx],
+                    self.class_names,
+                    bbox_color=(0, 233, 255),
+                    text_color=(0, 233, 255),
+                    thickness=2,
+                    show=True,
+                    win_name=self.backend,
+                )

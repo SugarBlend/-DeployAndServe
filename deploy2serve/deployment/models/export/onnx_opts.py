@@ -1,14 +1,19 @@
-from typing import Any, Mapping, Optional, Sequence, Union, List, Tuple, Dict
+from typing import Any, List, Mapping, Optional, Sequence, Union
+
 from pydantic import BaseModel, Field, field_validator
+
 # from pathlib import Path
 from torch.onnx import _C_onnx
+
 from deploy2serve.deployment.models.export.common import Plugin
 
 
 class SpecificOptions(BaseModel):
     keep_initializers_as_inputs: bool = Field(
-        default=False, description="If True, all the initializers (typically corresponding to model weights) in the "
-                                   "exported graph will also be added as inputs to the graph.")
+        default=False,
+        description="If True, all the initializers (typically corresponding to model weights) in the "
+        "exported graph will also be added as inputs to the graph.",
+    )
     export_params: bool = Field(default=True, description="If specified, all parameters will be exported.")
     verbose: Optional[bool] = Field(default=None, description="Whether to enable verbose logging.")
     input_names: Optional[Sequence[str]] = Field(
@@ -17,8 +22,9 @@ class SpecificOptions(BaseModel):
     output_names: Optional[Sequence[str]] = Field(
         default=None, description="Names to assign to the output nodes of the graph."
     )
-    opset_version: Optional[int] = Field(default=13, description="The version of the default (ai.onnx) opset to "
-                                                                 "target. Must be >= 7.")
+    opset_version: Optional[int] = Field(
+        default=13, description="The version of the default (ai.onnx) opset to " "target. Must be >= 7."
+    )
     dynamic_axes: Optional[Union[Mapping[str, Mapping[int, str]], Mapping[str, Sequence[int]]]] = Field(
         default=None, description="Describe the dimensional information about input and output."
     )
@@ -48,7 +54,6 @@ class SpecificOptions(BaseModel):
     # fallback: bool = Field(default=False, description="Whether to fallback to the TorchScript exporter if the dynamo "
     #                                                   "exporter fails. This option is only valid when dynamo is True. ")
 
-
     @field_validator("training", mode="before")
     def parse_training(cls, val: Any) -> _C_onnx.TrainingMode:
         if isinstance(val, str):
@@ -62,6 +67,7 @@ class SpecificOptions(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
+
 
 class OnnxConfig(BaseModel):
     specific: SpecificOptions = Field(description="Specific options for build in onnx format.")

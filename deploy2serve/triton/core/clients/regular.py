@@ -1,23 +1,20 @@
 import asyncio
-import cv2
 from functools import partial
-import numpy as np
-from queue import Queue, Empty
+from queue import Empty, Queue
 from threading import Thread
-from typing import Dict, Union, Callable, List
+from typing import Callable, Dict, List, Union
 
-from deploy2serve.triton.core.configs import Url, Formats, ProtocolType
+import cv2
+import numpy as np
+
 from deploy2serve.triton.core.base.inference_server import TritonRemote
 from deploy2serve.triton.core.base.service import BaseService, collect_frames
+from deploy2serve.triton.core.configs import Formats, ProtocolType, Url
 
 
 class Service(BaseService):
     def __init__(
-            self,
-            inference_server_cls: Union[TritonRemote, Callable],
-            fastapi: Url,
-            triton: Url,
-            protocol: ProtocolType
+        self, inference_server_cls: Union[TritonRemote, Callable], fastapi: Url, triton: Url, protocol: ProtocolType
     ) -> None:
         super(Service, self).__init__(inference_server_cls, fastapi, triton, protocol)
 
@@ -32,9 +29,7 @@ class Service(BaseService):
             self.logger.error(error)
 
     async def send_requests(
-            self,
-            frame_queue: Queue[np.ndarray],
-            thread_collector: Thread
+        self, frame_queue: Queue[np.ndarray], thread_collector: Thread
     ) -> Dict[int, List[np.ndarray]]:
         tasks: List[asyncio.tasks.Task] = []
         results: Dict[int, List[np.ndarray]] = {}

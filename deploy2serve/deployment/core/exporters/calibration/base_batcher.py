@@ -1,12 +1,11 @@
 from abc import ABC, abstractmethod
-import numpy as np
 from typing import Generator
+
+import numpy as np
 
 
 class BaseBatcher(ABC):
-    def __init__(
-            self
-    ) -> None:
+    def __init__(self) -> None:
         pass
 
     def __parse_labels(self) -> None:

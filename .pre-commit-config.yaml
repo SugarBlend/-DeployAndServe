@@ -31,21 +31,6 @@ repos:
           "--exclude=venv/|build/|dist/|__pycache__/",
           "--target-version=py310",
         ]
-      - id: isort
-        name: Isort code formatter
-        entry: isort
-        language: python
-        types: [ python ]
-        args: [
-          "--profile=black",
-          "--trailing-comma",
-          "--line-length=120",
-          "--lines-after-imports=2",
-          "--force-grid-wrap=0",
-          "--use-parentheses",
-          "--ensure-newline-before-comments",
-          "--skip=__init__.py",
-        ]
       - id: flake8
         name: Flake8 code linter
         entry: flake8
@@ -54,7 +39,7 @@ repos:
         args: [
           "--extend-exclude=.git,__pycache__,venv*,__init__.py,build,dist,docs",
           "--max-line-length=120",
-          "--ignore=E402,E501,W503,E203,F811",
+          "--ignore=C901,E203,E402,E501,F811,F821,W503",
           "--show-source",
           "--statistics",
           "--jobs=auto",

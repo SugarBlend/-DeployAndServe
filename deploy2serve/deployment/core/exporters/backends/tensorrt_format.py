@@ -26,17 +26,21 @@ class TensorRTExporter(BaseExporter):
         self.logger = get_logger("tensorrt")
 
     def register_tensorrt_plugins(self, *args, **kwargs) -> Any:
-        raise NotImplementedError("This method doesn't implemented, your should create him in custom class, "
-                                  "based on ExtendExporter")
+        raise NotImplementedError(
+            "This method doesn't implemented, your should create him in custom class, " "based on ExtendExporter"
+        )
 
     def benchmark(self) -> None:
         import tensorrt as trt
+
         from deploy2serve.deployment.core.executors.backends.tensrt import TensorRTExecutor
 
         self.logger.info(f"Start benchmark of model: {self.engine_path}")
         bindings, binding_address, context = TensorRTExecutor.load(
-            self.engine_path, self.config.tensorrt.specific.profile_shapes[0]["max"][0], self.config.device,
-            trt.Logger.ERROR
+            self.engine_path,
+            self.config.tensorrt.specific.profile_shapes[0]["max"][0],
+            self.config.device,
+            trt.Logger.ERROR,
         )
         shapes: List[Tuple[int, ...]] = []
         for profile_shapes in self.config.tensorrt.specific.profile_shapes:

@@ -1,6 +1,7 @@
-from enum import Enum
-import yaml
 import json
+from enum import Enum
+
+import yaml
 from pydantic import BaseModel, Field
 
 
@@ -34,7 +35,7 @@ class ServiceConfig(BaseModel):
     fastapi: Url = Field(description="Url for creation fastapi user server.")
     triton: Url = Field(description="Url for connection to triton container server.")
     protocol: ProtocolType = Field(description="Triton network protocol type.")
-    server: OverrideFunctionality  = Field(description="Module and class which implements server logic.")
+    server: OverrideFunctionality = Field(description="Module and class which implements server logic.")
 
     @classmethod
     def from_file(cls, path: str) -> "ServiceConfig":
@@ -48,4 +49,3 @@ class ServiceConfig(BaseModel):
             raise NotImplementedError("At now support configuration files with such extensions: '.json', '.yml'.")
 
         return ServiceConfig.model_validate(data)
-

@@ -1,10 +1,11 @@
-import numpy as np
-import json
 import io
-from PIL import Image
-import triton_python_backend_utils as pb_utils  # type: ignore[attr-defined]
+import json
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
 import torch
-from typing import List, Dict, Tuple, Any, Optional
+import triton_python_backend_utils as pb_utils  # type: ignore[attr-defined]
+from PIL import Image
 
 
 class TritonPythonModel:
@@ -24,12 +25,12 @@ class TritonPythonModel:
         for node in self.config["input"]:
             self.inputs[node["name"]] = {
                 "dtype": pb_utils.triton_string_to_numpy(node["data_type"]),
-                "dims": node["dims"]
+                "dims": node["dims"],
             }
         for node in self.config["output"]:
             self.outputs[node["name"]] = {
                 "dtype": pb_utils.triton_string_to_numpy(node["data_type"]),
-                "dims": node["dims"]
+                "dims": node["dims"],
             }
 
         self.device = "cuda" if args["model_instance_kind"] == "GPU" else "cpu"
@@ -48,7 +49,7 @@ class TritonPythonModel:
         padded_image = np.full((self.target_height, self.target_width, 3), 114, dtype=np.float32)
         dw = (self.target_width - new_width) // 2
         dh = (self.target_height - new_height) // 2
-        padded_image[dh: dh + new_height, dw: dw + new_width] = np.array(image)
+        padded_image[dh : dh + new_height, dw : dw + new_width] = np.array(image)
 
         tensor = padded_image.transpose(2, 0, 1) / 255.0
         return tensor[None].astype(np.float16), np.array([height, width], dtype=np.float16).reshape(-1, 2)

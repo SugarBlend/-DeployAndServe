@@ -19,6 +19,7 @@ class OpenVINORTExecutor(BaseExecutor):
     @staticmethod
     def load(openvino_path: Union[str, Path], device: str) -> "ov.CompiledModel":
         import openvino as ov
+
         core = ov.Core()
         model = core.read_model(openvino_path)
         compiled_model = core.compile_model(model, device)

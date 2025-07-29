@@ -1,7 +1,7 @@
 # YOLO Triton Inference Server — Ensemble and Regular Modes
 
-This example demonstrates the implementation of both the regular and ensemble versions of the service using Triton Inference Server.  
-Before running, you must complete the steps specified in the **basis of this module**.  
+This example demonstrates the implementation of both the regular and ensemble versions of the service using Triton Inference Server.
+Before running, you must complete the steps specified in the **basis of this module**.
 After successfully forming the model hierarchy, you can run one of the two available modes:
 
 ---
@@ -78,7 +78,7 @@ python deploy2serve/triton/overrides/yolo/server.py --service_config deploy2serv
 
 You can monitor performance metrics via **Grafana**:
 
-1. Open Grafana in your browser:  
+1. Open Grafana in your browser:
    [http://localhost:3000](http://localhost:3000)
 
 2. Import the pre-made [dashboard](../../docker/grafana/grafana-dash.json)
@@ -91,7 +91,7 @@ You should now see performance graphs related to the Triton server.
 
 ## Interacting with the Service
 
-Visit the service documentation at (default as per config): [http://127.0.0.1:5001/docs](http://127.0.0.1:5001/docs)  
+Visit the service documentation at (default as per config): [http://127.0.0.1:5001/docs](http://127.0.0.1:5001/docs)
 You’ll see the **Swagger UI** with available endpoints.
 
 ---

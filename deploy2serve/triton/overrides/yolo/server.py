@@ -1,13 +1,14 @@
+import time
+from importlib import import_module
+from typing import Any, List, Optional, Tuple
+
 import cv2
 import numpy as np
-from importlib import import_module
 import torch
-import time
-from typing import Any, List, Tuple, Optional
 from ultralytics.data.augment import LetterBox
 from ultralytics.utils.ops import non_max_suppression, scale_boxes
 
-from deploy2serve.triton.core.base.inference_server import TritonRemote, ProtocolType
+from deploy2serve.triton.core.base.inference_server import ProtocolType, TritonRemote
 from deploy2serve.triton.core.base.service import parse_options
 from deploy2serve.triton.core.configs import ServiceConfig
 
@@ -56,13 +57,15 @@ class RegularYoloTriton(TritonRemote):
 if __name__ == "__main__":
     args = parse_options()
 
-    if 'ensemble' in args.service_config:
+    if "ensemble" in args.service_config:
         from deploy2serve.triton.core.clients.ensemble import Service
-    elif 'regular' in args.service_config:
+    elif "regular" in args.service_config:
         from deploy2serve.triton.core.clients.ensemble import Service
     else:
-        raise Exception("Configuration file of service must have word 'ensemble' of 'regular' in name of file "
-                        "for correct launch.")
+        raise Exception(
+            "Configuration file of service must have word 'ensemble' of 'regular' in name of file "
+            "for correct launch."
+        )
 
     config = ServiceConfig.from_file(args.service_config)
     cls = getattr(import_module(config.server.module), config.server.cls)

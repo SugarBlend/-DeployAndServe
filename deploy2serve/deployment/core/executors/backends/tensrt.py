@@ -1,9 +1,10 @@
 from collections import OrderedDict
 from pathlib import Path
-import numpy as np
-import torch
-import tensorrt as trt
 from typing import List, Literal, Tuple, Union
+
+import numpy as np
+import tensorrt as trt
+import torch
 from pydantic import BaseModel, Field
 from ultralytics.utils.checks import check_version
 
@@ -19,8 +20,15 @@ class Binding(BaseModel):
     ptr: int = Field(description="Address of current named tensor on gpu.")
     io_mode: Literal["output", "input"] = Field(description="Type of node (input / output).")
 
-    def __init__(self, name: str, dtype: type, shape: Union[List[int], Tuple[int, ...]], data: torch.Tensor,
-                 ptr: int, io_mode: str) -> None:
+    def __init__(
+        self,
+        name: str,
+        dtype: type,
+        shape: Union[List[int], Tuple[int, ...]],
+        data: torch.Tensor,
+        ptr: int,
+        io_mode: str,
+    ) -> None:
         super().__init__(name=name, dtype=dtype, shape=shape, data=data, ptr=ptr, io_mode=io_mode)
 
     class Config:
@@ -35,8 +43,10 @@ class TensorRTExecutor(BaseExecutor):
             self.config.tensorrt.output_file = str(get_project_root().joinpath(self.config.tensorrt.output_file))
 
         self.bindings, self.binding_address, self.context = self.load(
-            self.config.tensorrt.output_file, self.config.tensorrt.specific.profile_shapes[0]["max"][0],
-            self.config.device, self.config.tensorrt.specific.log_level
+            self.config.tensorrt.output_file,
+            self.config.tensorrt.specific.profile_shapes[0]["max"][0],
+            self.config.device,
+            self.config.tensorrt.specific.log_level,
         )
         self.async_stream = torch.cuda.Stream(device=config.device, priority=-1)
         for node in self.bindings:

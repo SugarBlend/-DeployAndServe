@@ -1,5 +1,6 @@
-import torch
 from typing import List
+
+import torch
 
 
 class WrappedModel(torch.nn.Module):
@@ -19,6 +20,7 @@ class WrappedModel(torch.nn.Module):
         bs, anchors, xyxy = boxes.shape
 
         return [boxes.reshape(bs, anchors, 1, xyxy), scores]
+
 
 class Model(torch.nn.Module):
     def __init__(self, model: torch.nn.Module):

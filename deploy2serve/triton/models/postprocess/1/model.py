@@ -1,26 +1,31 @@
-import numpy as np
 import json
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
 import torch
 import triton_python_backend_utils as pb_utils  # type: ignore[attr-defined]
-from typing import Optional, Dict, Any, List, Tuple
 
 
 def empty_like(x):
-    """Create empty torch.Tensor or np.ndarray with same shape as input and float32 dtype."""
+    """Create empty torch.Tensor or np.ndarray with same shape as input and
+    float32 dtype."""
     return (
         torch.empty_like(x, dtype=torch.float32) if isinstance(x, torch.Tensor) else np.empty_like(x, dtype=np.float32)
     )
 
+
 def xywh2xyxy(x):
     """
-    Convert bounding box coordinates from (x, y, width, height) format to (x1, y1, x2, y2) format where (x1, y1) is the
-    top-left corner and (x2, y2) is the bottom-right corner. Note: ops per 2 channels faster than per channel.
+    Convert bounding box coordinates from (x, y, width, height) format to (x1,
+    y1, x2, y2) format where (x1, y1) is the top-left corner and (x2, y2) is
+    the bottom-right corner. Note: ops per 2 channels faster than per channel.
 
     Args:
         x (np.ndarray | torch.Tensor): Input bounding box coordinates in (x, y, width, height) format.
 
     Returns:
         (np.ndarray | torch.Tensor): Bounding box coordinates in (x1, y1, x2, y2) format.
+
     """
     assert x.shape[-1] == 4, f"input shape last dimension expected 4 but input shape is {x.shape}"
     y = empty_like(x)  # faster than clone/copy
@@ -29,6 +34,7 @@ def xywh2xyxy(x):
     y[..., :2] = xy - wh  # top left xy
     y[..., 2:] = xy + wh  # bottom right xy
     return y
+
 
 def non_max_suppression(
     prediction,
@@ -77,6 +83,7 @@ def non_max_suppression(
         output (List[torch.Tensor]): List of detections per image with shape (num_boxes, 6 + num_masks)
             containing (x1, y1, x2, y2, confidence, class, mask1, mask2, ...).
         keepi (List[torch.Tensor]): Indices of kept detections if return_idxs=True.
+
     """
     import torchvision  # scope for faster 'import ultralytics'
 
@@ -103,7 +110,7 @@ def non_max_suppression(
 
     # Settings
     # min_wh = 2  # (pixels) minimum box width and height
-    time_limit = 2.0 + max_time_img * bs  # seconds to quit after
+    # time_limit = 2.0 + max_time_img * bs  # seconds to quit after
     multi_label &= nc > 1  # multiple labels per box (adds 0.5ms/img)
 
     prediction = prediction.transpose(-1, -2)  # shape(1,84,6300) to shape(1,6300,84)
@@ -187,12 +194,12 @@ class TritonPythonModel:
         for node in self.config["input"]:
             self.inputs[node["name"]] = {
                 "dtype": pb_utils.triton_string_to_numpy(node["data_type"]),
-                "dims": node["dims"]
+                "dims": node["dims"],
             }
         for node in self.config["output"]:
             self.outputs[node["name"]] = {
                 "dtype": pb_utils.triton_string_to_numpy(node["data_type"]),
-                "dims": node["dims"]
+                "dims": node["dims"],
             }
         self.device = "cuda" if args["model_instance_kind"] == "GPU" else "cpu"
 
@@ -240,7 +247,7 @@ class TritonPythonModel:
 
             detections = self.postprocess(tensor, input_shape)
 
-            output_node, = self.outputs.keys()
+            (output_node,) = self.outputs.keys()
             result = pb_utils.Tensor(output_node, detections.cpu().numpy().astype(self.outputs[output_node]["dtype"]))
 
             inference_response = pb_utils.InferenceResponse([result])

@@ -1,23 +1,24 @@
-import aiohttp
 import asyncio
-from argparse import Namespace, ArgumentParser
-import cv2
-from fastapi import FastAPI, UploadFile, File, Query
-from fastapi.responses import FileResponse, Response
 import os
+import pickle
+import tempfile
+import time
+from argparse import ArgumentParser, Namespace
+from queue import Empty, Queue
+from threading import Thread
+from typing import List
+
+import aiohttp
+import cv2
+import numpy as np
+import uvicorn
+from fastapi import FastAPI, File, Query, UploadFile
+from fastapi.responses import FileResponse, Response
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Summary, generate_latest, make_asgi_app
 from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException
-import pickle
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest, make_asgi_app, Summary, Counter
-import numpy as np
-from queue import Queue, Empty
-from typing import List
-from threading import Thread
-import time
-import tempfile
-import uvicorn
 
-from deploy2serve.triton.base_service import collect_frames
+from deploy2serve.triton.core.base.service import collect_frames
 from deploy2serve.utils.logger import get_logger
 
 
@@ -28,11 +29,7 @@ class Service(object):
         self.logger = get_logger("torchserve")
 
     async def send_requests(
-            self,
-            session: aiohttp.ClientSession,
-            model_name: str,
-            frame_queue: Queue[np.ndarray],
-            thread_collector: Thread
+        self, session: aiohttp.ClientSession, model_name: str, frame_queue: Queue[np.ndarray], thread_collector: Thread
     ) -> List[List[np.ndarray]]:
         tasks: List[asyncio.Task] = []
         results: List[asyncio.Future] = []
@@ -50,10 +47,9 @@ class Service(object):
                 _, img_encoded = cv2.imencode(".jpg", frame)
                 task = asyncio.create_task(
                     session.post(
-                        f"http://{self.inference_server_url}/predictions/{model_name}",
-                        data=img_encoded.tobytes()
+                        f"http://{self.inference_server_url}/predictions/{model_name}", data=img_encoded.tobytes()
                     ),
-                    name=f"Task:{counter}"
+                    name=f"Task:{counter}",
                 )
                 tasks.append(task)
                 counter += 1
@@ -78,7 +74,9 @@ class Service(object):
                     collector_thread.start()
                     return await self.send_requests(session, model_name, frame_queue, collector_thread)
                 elif media_type == "image":
-                    response = await session.post(f"http://{self.inference_server_url}/predictions/{model_name}", data=data)
+                    response = await session.post(
+                        f"http://{self.inference_server_url}/predictions/{model_name}", data=data
+                    )
                     return await response.json(content_type=None)
                 else:
                     raise NotImplementedError("Passed unsupported data type of file.")
@@ -93,26 +91,16 @@ class Service(object):
         metrics_app = make_asgi_app()
         app.mount("/metrics", metrics_app)
 
-        REQUEST_TIME = Summary(
-            "predict_request_processing_seconds",
-            "Time spent processing predict request"
-        )
-        REQUEST_COUNT = Counter(
-            "predict_request_count_total",
-            "Total predict requests count"
-        )
+        REQUEST_TIME = Summary("predict_request_processing_seconds", "Time spent processing predict request")
+        REQUEST_COUNT = Counter("predict_request_count_total", "Total predict requests count")
 
         @app.get("/metrics")
         async def metrics() -> Response:
-            return Response(
-                content=generate_latest(),
-                media_type=CONTENT_TYPE_LATEST
-            )
+            return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
         @app.post("/predict")
         async def predict(
-                file: UploadFile = File(description="Uploaded file."),
-                model_name: str = Query(description="Model name.")
+            file: UploadFile = File(description="Uploaded file."), model_name: str = Query(description="Model name.")
         ) -> FileResponse:
             REQUEST_COUNT.inc()
             start_time = time.time()
@@ -125,8 +113,12 @@ class Service(object):
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pickle") as temp:
                     pickle.dump(result, temp)
 
-                return FileResponse(temp.name, filename="data.pickle", media_type="application/octet-stream",
-                                    background=BackgroundTask(lambda: os.unlink(temp.name)))
+                return FileResponse(
+                    temp.name,
+                    filename="data.pickle",
+                    media_type="application/octet-stream",
+                    background=BackgroundTask(lambda: os.unlink(temp.name)),
+                )
 
             except Exception as error:
                 raise HTTPException(status_code=500, detail=str(error))
@@ -150,7 +142,7 @@ if __name__ == "__main__":
     args = parse_options()
     api = Service(
         fastapi_url=f"{args.service_host}:{args.service_port}",
-        inference_server_url=f"{args.torchserve_host}:{args.torchserve_port}"
+        inference_server_url=f"{args.torchserve_host}:{args.torchserve_port}",
     )
     server = api.create()
     server.run()

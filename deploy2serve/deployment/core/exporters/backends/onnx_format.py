@@ -3,6 +3,7 @@ from copy import deepcopy
 from pathlib import Path
 from statistics import stdev
 from typing import List
+
 import numpy as np
 import onnx
 import onnxslim
@@ -22,11 +23,13 @@ class ONNXExporter(BaseExporter):
         self.logger = get_logger("onnx")
 
     def register_onnx_plugins(self):
-        raise NotImplementedError("This method doesn't implemented, your should create him in custom class, "
-                                  "based on ExtendExporter")
+        raise NotImplementedError(
+            "This method doesn't implemented, your should create him in custom class, " "based on ExtendExporter"
+        )
 
     def benchmark(self) -> None:
         import onnxruntime as ort
+
         from deploy2serve.deployment.core.executors.backends.onnxrt import ORTExecutor
 
         self.logger.info(f"Start benchmark of model: {self.onnx_path}")

@@ -1,24 +1,25 @@
+import base64
+import os
+import pickle
+import tempfile
+import time
 from abc import ABC, abstractmethod
 from argparse import ArgumentParser, Namespace
-import base64
-import cv2
-from fastapi import FastAPI, File, UploadFile, Query
-from fastapi.responses import FileResponse, Response
-import pickle
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest, make_asgi_app, Summary, Counter
-import os
 from queue import Queue
+from typing import Any, Callable, Optional, Union
+
+import cv2
+import uvicorn
+from fastapi import FastAPI, File, Query, UploadFile
+from fastapi.responses import FileResponse, Response
 from imutils.video import FileVideoStream
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Summary, generate_latest, make_asgi_app
 from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException
-import tempfile
 from tqdm import tqdm
-from typing import Union, Callable, Optional, Any
-import time
-import uvicorn
 
-from deploy2serve.triton.core.configs import Url, ProtocolType
 from deploy2serve.triton.core.base.inference_server import TritonRemote
+from deploy2serve.triton.core.configs import ProtocolType, Url
 from deploy2serve.utils.logger import get_logger
 from deploy2serve.utils.runner import ServerRunner
 
@@ -45,11 +46,7 @@ def collect_frames(data: bytes, container: str, frame_queue: Queue) -> None:
 
 class BaseService(ABC):
     def __init__(
-            self,
-            inference_server_cls: Union[TritonRemote, Callable],
-            fastapi: Url,
-            triton: Url,
-            protocol: ProtocolType
+        self, inference_server_cls: Union[TritonRemote, Callable], fastapi: Url, triton: Url, protocol: ProtocolType
     ) -> None:
         self.inference_server_cls: Union[TritonRemote, Callable] = inference_server_cls
         self.fastapi: Url = fastapi
@@ -74,26 +71,16 @@ class BaseService(ABC):
         metrics_app = make_asgi_app()
         app.mount("/metrics", metrics_app)
 
-        REQUEST_TIME = Summary(
-            'predict_request_processing_seconds',
-            'Time spent processing predict request'
-        )
-        REQUEST_COUNT = Counter(
-            'predict_request_count_total',
-            'Total predict requests count'
-        )
+        REQUEST_TIME = Summary("predict_request_processing_seconds", "Time spent processing predict request")
+        REQUEST_COUNT = Counter("predict_request_count_total", "Total predict requests count")
 
         @app.get("/metrics")
         async def metrics() -> Response:
-            return Response(
-                content=generate_latest(),
-                media_type=CONTENT_TYPE_LATEST
-            )
+            return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
         @app.post("/predict")
         async def predict(
-                file: UploadFile = File(description="Uploaded file."),
-                model_name: str = Query(description="Model name.")
+            file: UploadFile = File(description="Uploaded file."), model_name: str = Query(description="Model name.")
         ) -> FileResponse:
             REQUEST_COUNT.inc()
             start_time = time.time()
@@ -113,8 +100,12 @@ class BaseService(ABC):
 
                 await self.inference_server.triton_client.close()
 
-                return FileResponse(temp.name, filename="data.pickle", media_type="application/octet-stream",
-                                    background=BackgroundTask(lambda: os.unlink(temp.name)))
+                return FileResponse(
+                    temp.name,
+                    filename="data.pickle",
+                    media_type="application/octet-stream",
+                    background=BackgroundTask(lambda: os.unlink(temp.name)),
+                )
             except Exception as error:
                 raise HTTPException(status_code=500, detail=str(error))
 
@@ -126,5 +117,10 @@ class BaseService(ABC):
 def parse_options() -> Namespace:
     parser = ArgumentParser()
     from deploy2serve.utils.logger import get_project_root
-    parser.add_argument("--service_config", default=f"{get_project_root()}/deploy2serve/triton/overrides/yolo/configs/ensemble.yaml", help="Path to service configuration.")
+
+    parser.add_argument(
+        "--service_config",
+        default=f"{get_project_root()}/deploy2serve/triton/overrides/yolo/configs/ensemble.yaml",
+        help="Path to service configuration.",
+    )
     return parser.parse_args()

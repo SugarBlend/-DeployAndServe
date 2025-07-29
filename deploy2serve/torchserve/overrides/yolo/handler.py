@@ -1,14 +1,15 @@
 import base64
-import cv2
-import sys
 import io
 import os
+import sys
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+
+import cv2
 import numpy as np
+import torch
 import ts.context
 from PIL import Image
-from pathlib import Path
-import torch
-from typing import List, Dict, Any, Tuple
 from ts.torch_handler.base_handler import BaseHandler
 from ultralytics.data.augment import LetterBox
 from ultralytics.utils.ops import non_max_suppression, scale_boxes

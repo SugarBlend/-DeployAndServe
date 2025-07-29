@@ -1,16 +1,20 @@
 from argparse import ArgumentParser, Namespace
 from importlib import import_module
-from typing import Callable
 from pathlib import Path
-from deploy2serve.deployment.models.export import ExportConfig
+from typing import Callable
 
+from deploy2serve.deployment.models.export import ExportConfig
 from deploy2serve.utils.logger import get_project_root
 
 
 def parse() -> Namespace:
     parser = ArgumentParser()
-    parser.add_argument("--deploy_config", default="overrides/yolo/configs/efficient_nms.yml",
-                        type=str, help="Way for deploy configuration.")
+    parser.add_argument(
+        "--deploy_config",
+        default="overrides/yolo/configs/efficient_nms.yml",
+        type=str,
+        help="Way for deploy configuration.",
+    )
     return parser.parse_args()
 
 

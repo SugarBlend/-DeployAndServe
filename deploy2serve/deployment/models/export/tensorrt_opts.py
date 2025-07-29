@@ -1,9 +1,10 @@
 from typing import Dict, List, Optional, Tuple, Union
+
 import tensorrt as trt
 from pydantic import BaseModel, Field, field_validator
 from ultralytics.utils.checks import check_version
 
-from deploy2serve.deployment.models.export.common import Precision, Plugin
+from deploy2serve.deployment.models.export.common import Plugin, Precision
 from deploy2serve.utils.logger import get_logger, logging
 
 
@@ -24,15 +25,20 @@ class SpecificOptions(BaseModel):
         default=None, description="Flag in trt.BuilderFlag format."
     )
     profiling_verbosity: Optional[Union[str, trt.ProfilingVerbosity]] = Field(
-        default="LAYER_NAMES_ONLY", description="List of verbosity levels of layer information exposed in NVTX "
-                                                "annotations and in IEngineInspector.")
+        default="LAYER_NAMES_ONLY",
+        description="List of verbosity levels of layer information exposed in NVTX "
+        "annotations and in IEngineInspector.",
+    )
     max_aux_streams: int = Field(default=4, description="")
     runtime_platform: Optional[Union[str, "trt.RuntimePlatform"]] = Field(
-        default=None, description="Describes the intended runtime platform (operating system and CPU "
-                                  "architecture) for the execution of the TensorRT engine.")
+        default=None,
+        description="Describes the intended runtime platform (operating system and CPU "
+        "architecture) for the execution of the TensorRT engine.",
+    )
     compatibility_level: Optional[Union[str, "trt.HardwareCompatibilityLevel"]] = Field(
-        default="SAME_COMPUTE_CAPABILITY", description="Describes requirements of compatibility with GPU architectures "
-                                                       "other than that of the GPU on which the engine was built."
+        default="SAME_COMPUTE_CAPABILITY",
+        description="Describes requirements of compatibility with GPU architectures "
+        "other than that of the GPU on which the engine was built.",
     )
     tactics: Optional[List[Union[str, trt.TacticSource]]] = Field(
         default=None, description="List of using tactics for optimizations."
@@ -135,9 +141,7 @@ class TensorrtConfig(BaseModel):
     )
     plugins: List[Plugin] = Field(default=[], description="List of plugins, which can be connect to model.")
     force_rebuild: bool = Field(default=False, description="Forcefully rebuild the existing model.")
-    output_file: str = Field(
-        default="weights/tensorrt/model.plan", description="Path to save converted model."
-    )
+    output_file: str = Field(default="weights/tensorrt/model.plan", description="Path to save converted model.")
 
     class Config:
         arbitrary_types_allowed = True

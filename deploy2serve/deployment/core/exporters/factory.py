@@ -2,9 +2,16 @@ import types
 from abc import ABC, abstractmethod
 from contextlib import nullcontext
 from typing import Any, Dict, Optional, Type
+
 import torch.nn
 
-from deploy2serve.deployment.core.exporters import BaseExporter, ONNXExporter, OpenVINOExporter, TensorRTExporter, TorchScriptExporter
+from deploy2serve.deployment.core.exporters import (
+    BaseExporter,
+    ONNXExporter,
+    OpenVINOExporter,
+    TensorRTExporter,
+    TorchScriptExporter,
+)
 from deploy2serve.deployment.models.export import Backend, ExportConfig
 
 
@@ -13,7 +20,7 @@ class ExporterFactory(object):
         Backend.TorchScript: TorchScriptExporter,
         Backend.ONNX: ONNXExporter,
         Backend.TensorRT: TensorRTExporter,
-        Backend.OpenVINO: OpenVINOExporter
+        Backend.OpenVINO: OpenVINOExporter,
     }
 
     @classmethod

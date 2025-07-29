@@ -1,15 +1,16 @@
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Union, Optional
+from typing import Optional, Union
+
 import numpy as np
-import torch
 import tensorrt as trt
+import torch
 from ultralytics import YOLO
 
 from deploy2serve.deployment.core.exporters.factory import Exporter
-from deploy2serve.deployment.overrides.yolo.model import WrappedModel, Model
 from deploy2serve.deployment.models.export import ExportConfig
 from deploy2serve.deployment.models.export.common import Plugin
-from contextlib import contextmanager
+from deploy2serve.deployment.overrides.yolo.model import Model, WrappedModel
 
 
 class YoloExporter(Exporter):
@@ -53,7 +54,7 @@ class YoloExporter(Exporter):
     def register_tensorrt_plugins(self, network: trt.INetworkDefinition) -> trt.INetworkDefinition:
         available_plugins = {
             "efficient_nms": YoloExporter.add_efficient_nms_plugin,
-            "batched_nms": YoloExporter.add_batched_nms_plugin
+            "batched_nms": YoloExporter.add_batched_nms_plugin,
         }
 
         for search_plugin, impl in available_plugins.items():
@@ -180,8 +181,16 @@ class YoloExporter(Exporter):
             ("numClasses", np.array([plugin.options["nc"]], dtype=np.int32), trt.PluginFieldType.INT32),
             ("topK", np.array([100], dtype=np.int32), trt.PluginFieldType.INT32),
             ("keepTopK", np.array([plugin.options["max_det"]], dtype=np.int32), trt.PluginFieldType.INT32),
-            ("scoreThreshold", np.array([plugin.options["score_threshold"]], dtype=np.float32), trt.PluginFieldType.FLOAT32),
-            ("iouThreshold", np.array([plugin.options["iou_threshold"]], dtype=np.float32), trt.PluginFieldType.FLOAT32),
+            (
+                "scoreThreshold",
+                np.array([plugin.options["score_threshold"]], dtype=np.float32),
+                trt.PluginFieldType.FLOAT32,
+            ),
+            (
+                "iouThreshold",
+                np.array([plugin.options["iou_threshold"]], dtype=np.float32),
+                trt.PluginFieldType.FLOAT32,
+            ),
             ("isNormalized", np.array([True], dtype=np.int32), trt.PluginFieldType.INT32),
             ("clipBoxes", np.array([False], dtype=np.int32), trt.PluginFieldType.INT32),
         ]

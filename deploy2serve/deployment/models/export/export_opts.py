@@ -1,5 +1,6 @@
 import json
 from typing import List, Tuple
+
 import torch.cuda
 import yaml
 from pydantic import BaseModel, Field, field_validator
@@ -17,8 +18,9 @@ class OverrideFunctionality(BaseModel):
 
 
 class ExportConfig(BaseModel):
-    enable_mixed_precision: bool = Field(default=True, description="Enable convert Pytorch model to fp16 precision "
-                                                                   "before launch export steps.")
+    enable_mixed_precision: bool = Field(
+        default=True, description="Enable convert Pytorch model to fp16 precision " "before launch export steps."
+    )
     torch_weights: str = Field(description="Path to original weights of the model which you want to convert.")
     formats: List[Backend] = Field(default=["onnx", "tensorrt"], description="Steps for deployment pipeline.")
     input_shape: Tuple[int, int] = Field(description="Shapes for optimization and transfer.")

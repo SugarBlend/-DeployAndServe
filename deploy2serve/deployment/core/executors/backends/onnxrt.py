@@ -1,8 +1,9 @@
+from pathlib import Path
+from typing import Any, List, Optional, Sequence, Tuple, Union
+
 import numpy as np
 import onnxruntime as ort
-from pathlib import Path
 import torch
-from typing import Any, List, Optional, Sequence, Tuple, Union
 
 from deploy2serve.deployment.core.executors.base import BaseExecutor, ExportConfig
 from deploy2serve.utils.logger import get_project_root

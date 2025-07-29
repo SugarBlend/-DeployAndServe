@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Type, Optional
+from typing import Any, Dict, Optional, Type
 
 from deploy2serve.deployment.core.executors import BaseExecutor, ORTExecutor, TensorRTExecutor
 from deploy2serve.deployment.core.executors.backends.openvinort import OpenVINORTExecutor
@@ -50,7 +50,7 @@ class ExecutorFactory(object):
         Backend.TorchScript: TorchScriptExecutor,
         Backend.ONNX: ORTExecutor,
         Backend.TensorRT: TensorRTExecutor,
-        Backend.OpenVINO: OpenVINORTExecutor
+        Backend.OpenVINO: OpenVINORTExecutor,
     }
 
     @classmethod
