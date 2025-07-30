@@ -21,7 +21,7 @@ class ORTExecutor(BaseExecutor):
             "arena_extend_strategy": "kSameAsRequested",
             "cudnn_conv_algo_search": "HEURISTIC",
             "do_copy_in_default_stream": True,
-            "enable_cuda_graph": True,
+            "enable_cuda_graph": False,
             "enable_skip_layer_norm_strict_mode": True,
             "use_tf32": True,
         }
