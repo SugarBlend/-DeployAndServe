@@ -1,4 +1,4 @@
-import os.path
+import urllib.request
 from typing import List, Tuple
 
 import cv2
@@ -19,86 +19,15 @@ class YoloExecutor(ExtendExecutor):
         super(YoloExecutor, self).__init__(config)
         self.letterbox = LetterBox(new_shape=self.config.input_shape)
         self.class_names = [
-            "person",
-            "bicycle",
-            "car",
-            "motorcycle",
-            "airplane",
-            "bus",
-            "train",
-            "truck",
-            "boat",
-            "traffic light",
-            "fire hydrant",
-            "stop sign",
-            "parking meter",
-            "bench",
-            "bird",
-            "cat",
-            "dog",
-            "horse",
-            "sheep",
-            "cow",
-            "elephant",
-            "bear",
-            "zebra",
-            "giraffe",
-            "backpack",
-            "umbrella",
-            "handbag",
-            "tie",
-            "suitcase",
-            "frisbee",
-            "skis",
-            "snowboard",
-            "sports ball",
-            "kite",
-            "baseball bat",
-            "baseball glove",
-            "skateboard",
-            "surfboard",
-            "tennis racket",
-            "bottle",
-            "wine glass",
-            "cup",
-            "fork",
-            "knife",
-            "spoon",
-            "bowl",
-            "banana",
-            "apple",
-            "sandwich",
-            "orange",
-            "broccoli",
-            "carrot",
-            "hot dog",
-            "pizza",
-            "donut",
-            "cake",
-            "chair",
-            "couch",
-            "potted plant",
-            "bed",
-            "dining table",
-            "toilet",
-            "tv",
-            "laptop",
-            "mouse",
-            "remote",
-            "keyboard",
-            "cell phone",
-            "microwave",
-            "oven",
-            "toaster",
-            "sink",
-            "refrigerator",
-            "book",
-            "clock",
-            "vase",
-            "scissors",
-            "teddy bear",
-            "hair drier",
-            "toothbrush",
+            "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light",
+            "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow",
+            "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee",
+            "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard",
+            "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple",
+            "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch",
+            "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse", "remote", "keyboard",
+            "cell phone", "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors",
+            "teddy bear", "hair drier", "toothbrush",
         ]
 
     def preprocess(self, image: np.ndarray) -> torch.Tensor:
@@ -153,25 +82,25 @@ class YoloExecutor(ExtendExecutor):
         return boxes, scores, classes
 
     def plotter(self) -> None:
-        file_path = f"{get_project_root()}/resources/demo.jpg"
-        if not os.path.exists(file_path):
+        file_path = get_project_root().joinpath("resources/demo.jpg")
+        if not file_path.exists():
             self.logger.warning(f"Demo file is not exist: {file_path}, skip visualization step")
+            image_url = "https://ultralytics.com/images/zidane.jpg"
+            try:
+                file_path.parent.mkdir(exist_ok=True, parents=True)
+                urllib.request.urlretrieve(image_url, file_path)
+            except Exception as error:
+                self.logger.warning(f"Failed to get image from link: {error}. Skip visualization step.")
+                return
             return
 
-        image = cv2.imread(file_path)
+        image = cv2.imread(str(file_path))
         tensor = self.preprocess(image)
         output = self.infer(tensor, asynchronous=True)
         boxes, scores, classes = self.postprocess(output, image.shape[:2])
         if len(boxes):
             for idx in range(tensor.shape[0]):
                 imshow_det_bboxes(
-                    image,
-                    np.concatenate([boxes[idx], scores[idx]], axis=1),
-                    classes[idx],
-                    self.class_names,
-                    bbox_color=(0, 233, 255),
-                    text_color=(0, 233, 255),
-                    thickness=2,
-                    show=True,
-                    win_name=self.backend,
+                    image, np.concatenate([boxes[idx], scores[idx]], axis=1), classes[idx], self.class_names,
+                    bbox_color=(0, 233, 255), text_color=(0, 233, 255), thickness=2, show=True, win_name=self.backend,
                 )

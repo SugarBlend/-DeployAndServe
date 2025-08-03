@@ -9,12 +9,7 @@ from deploy2serve.utils.logger import get_project_root
 
 def parse() -> Namespace:
     parser = ArgumentParser()
-    parser.add_argument(
-        "--deploy_config",
-        default="overrides/yolo/configs/efficient_nms.yml",
-        type=str,
-        help="Way for deploy configuration.",
-    )
+    parser.add_argument("--deploy_config", default="overrides/yolo/configs/dynamic.yml", type=str, help="Way for deploy configuration.")
     return parser.parse_args()
 
 
@@ -30,7 +25,7 @@ def converter(args: Namespace) -> None:
     if not Path(config.torch_weights).is_absolute():
         config.torch_weights = str(get_project_root().joinpath(config.torch_weights))
 
-    exporter.load_checkpoints(config.torch_weights)
+    exporter.load_checkpoints(config.torch_weights, config.model_configuration)
     executor = get_object(config.executor.module, config.executor.cls)(config)
 
     for backend in config.formats:

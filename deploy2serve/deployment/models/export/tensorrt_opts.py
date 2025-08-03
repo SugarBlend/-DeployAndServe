@@ -4,7 +4,7 @@ import tensorrt as trt
 from pydantic import BaseModel, Field, field_validator
 from ultralytics.utils.checks import check_version
 
-from deploy2serve.deployment.models.export.common import Plugin, Precision
+from deploy2serve.deployment.models.export.common import Plugin, Precision, OverrideFunctionality
 from deploy2serve.utils.logger import get_logger, logging
 
 
@@ -99,6 +99,12 @@ class SpecificOptions(BaseModel):
                 cls.logger.warning(error)
         return flags
 
+    @field_validator("algorithm", mode="before")
+    def parse_algorithm(cls, algorithm: Union[str, trt.CalibrationAlgoType]) -> trt.CalibrationAlgoType:
+        if isinstance(algorithm, str):
+            algorithm = getattr(trt.CalibrationAlgoType, algorithm.upper())
+        return algorithm
+
     @field_validator("compatibility_level", mode="before")
     def parse_compatibility_level(cls, level: Optional[str]) -> Optional["trt.HardwareCompatibilityLevel"]:
         if not level:
@@ -130,6 +136,32 @@ class SpecificOptions(BaseModel):
         arbitrary_types_allowed = True
 
 
+class RoboflowDataset(BaseModel):
+    name: str = Field(description="")
+    api_key: str = Field(description="")
+    workspace: str = Field(description="")
+    version_number: str = Field(description="")
+    model_format: str = Field(description="")
+    project_id: str = Field(description="")
+
+
+class StandardDataset(BaseModel):
+    name: str = Field(description="")
+    images_url: str = Field(description="")
+    annotations_url: str = Field(description="")
+
+
+class Dataset(BaseModel):
+    description: Union[StandardDataset, RoboflowDataset] = Field(description="")
+    calibration_frames: Optional[int] = Field(default=None, description="")
+    exclude_frames: List[int] = Field(default=[], description="")
+    labels_generator: OverrideFunctionality = Field()
+    data_storage: OverrideFunctionality = Field()
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
 class TensorrtConfig(BaseModel):
     specific: SpecificOptions = Field(description="Specific options for build in tensorrt format.")
     enable_timing_cache: bool = Field(
@@ -139,6 +171,7 @@ class TensorrtConfig(BaseModel):
         default=True,
         description="Enable cache for faster rebuild in next launch of the same model with int builder precision.",
     )
+    dataset: Dataset = Field(description="")
     plugins: List[Plugin] = Field(default=[], description="List of plugins, which can be connect to model.")
     force_rebuild: bool = Field(default=False, description="Forcefully rebuild the existing model.")
     output_file: str = Field(default="weights/tensorrt/model.plan", description="Path to save converted model.")

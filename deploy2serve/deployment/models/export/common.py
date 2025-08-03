@@ -25,3 +25,9 @@ class Backend(str, Enum):
 class Plugin(BaseModel):
     name: str = Field(description="User name of plugin.")
     options: Dict[str, Any] = Field(description="Additional settings for plugin")
+
+
+class OverrideFunctionality(BaseModel):
+    module: str = Field(description="Way to module which consider override class.")
+    cls: str = Field(description="Class which consist of overrides under basic functionality.")
+

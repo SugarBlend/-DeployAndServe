@@ -1,4 +1,6 @@
 torch_weights: weights/pytorch/yolo12m.pt
+model_configuration: null
+
 formats:
   - onnx
   - tensorrt
@@ -9,12 +11,12 @@ repeats: 1000
 enable_benchmark: true
 enable_visualization: true
 
-executor:
-  module: deploy2serve.deployment.overrides.yolo.executor
-  cls: YoloExecutor
 exporter:
   module: deploy2serve.deployment.overrides.yolo.export
   cls: YoloExporter
+executor:
+  module: deploy2serve.deployment.overrides.yolo.executor
+  cls: YoloExecutor
 
 tensorrt:
   plugins:

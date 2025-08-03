@@ -1,57 +1,41 @@
 import os
 from copy import deepcopy
 from pathlib import Path
-from statistics import stdev
-from typing import List, Optional
-
-import numpy as np
+from typing import Optional
 import torch.jit
 
-from deploy2serve.deployment.core.exporters.base import BaseExporter, ExportConfig
+from deploy2serve.deployment.core.exporters.base import BaseExporter, ExportConfig, timer
+from deploy2serve.deployment.core.exporters.factory import ExporterFactory
+from deploy2serve.deployment.models.export import Backend
 from deploy2serve.utils.logger import get_logger, get_project_root
 
 
+@ExporterFactory.register(Backend.TorchScript)
 class TorchScriptExporter(BaseExporter):
-    def __init__(self, config: ExportConfig) -> None:
-        super(TorchScriptExporter, self).__init__(config)
-        self.torchscript_path = Path(self.config.torchscript.output_file)
-        if not self.torchscript_path.is_absolute():
-            self.torchscript_path = get_project_root().joinpath(self.torchscript_path)
-        self.torchscript_path.parent.mkdir(exist_ok=True, parents=True)
-        self.logger = get_logger("torchscript")
+    def __init__(self, config: ExportConfig, model: torch.nn.Module) -> None:
+        super(TorchScriptExporter, self).__init__(config, model)
+
+        self.save_path = Path(self.config.torchscript.output_file)
+        if not self.save_path.is_absolute():
+            self.save_path = get_project_root().joinpath(self.save_path)
+        self.save_path.parent.mkdir(exist_ok=True, parents=True)
+        self.logger = get_logger(self.__class__.__name__)
 
         self.traced_model: Optional[torch.jit.ScriptModule] = None
 
-    def benchmark(self) -> None:
-        self.logger.info(f"Start benchmark of model: {self.torchscript_path}")
+    @torch.no_grad()
+    def benchmark(self, warmup_iterations: int = 50) -> None:
+        self.logger.info(f"Start benchmark of model: {self.save_path}")
 
         layer_info = next(self.model.parameters())
         placeholder = torch.ones((1, 3, *self.config.input_shape), dtype=layer_info.dtype, device=layer_info.device)
-        timings: List[float] = []
-        start = torch.cuda.Event(enable_timing=True)
-        end = torch.cuda.Event(enable_timing=True)
-        self.traced_model = torch.jit.load(self.torchscript_path, map_location=self.config.device)
-        for _ in range(50):
-            self.traced_model(placeholder)
 
-        for _ in range(self.config.repeats):
-            start.record(torch.cuda.current_stream())
-            self.traced_model(placeholder)
-            end.record(torch.cuda.current_stream())
-            torch.cuda.synchronize()
-            timings.append(start.elapsed_time(end))
-
-        avg_time = np.mean(timings)
-        shape = "x".join(list(map(str, placeholder.shape)))
-
-        self.logger.info(f"[{shape}] Average latency: {avg_time:.2f} ms")
-        self.logger.info(f"[{shape}] Min latency: {min(timings):.2f} ms")
-        self.logger.info(f"[{shape}] Max latency: {max(timings):.2f} ms")
-        self.logger.info(f"[{shape}] Std latency: {stdev(timings):.2f} ms")
-        self.logger.info(f"[{shape}] Average throughput: {1000 / avg_time:.2f} FPS")
+        self.logger.info(f"Benchmark on tensor with shapes: {tuple(placeholder.shape)}")
+        with timer(self.logger, self.config.repeats, warmup_iterations=50) as t:
+            t(lambda: self.traced_model(placeholder))
 
     def export(self) -> None:
-        if os.path.exists(self.torchscript_path) and not self.config.torchscript.force_rebuild:
+        if os.path.exists(self.save_path) and not self.config.torchscript.force_rebuild:
             return
 
         self.logger.info("Try convert PyTorch model to TorchScript format")
@@ -68,5 +52,5 @@ class TorchScriptExporter(BaseExporter):
                 self.logger.info("TorchScript model successfully optimized")
             except Exception as error:
                 self.logger.critical(error)
-        self.traced_model.save(self.torchscript_path)
-        self.logger.info(f"TorchScript model successfully stored in: {self.torchscript_path}")
+        self.traced_model.save(self.save_path)
+        self.logger.info(f"TorchScript model successfully stored in: {self.save_path}")
