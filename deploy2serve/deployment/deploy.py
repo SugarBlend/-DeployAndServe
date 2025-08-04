@@ -20,13 +20,13 @@ def get_object(module_name: str, cls_name: str) -> Callable:
 def converter(args: Namespace) -> None:
     config = ExportConfig.from_file(args.deploy_config)
 
-    exporter = get_object(config.exporter.module, config.exporter.cls)(config)
+    exporter = get_object(config.exporter.module_path, config.exporter.class_name)(config)
 
     if not Path(config.torch_weights).is_absolute():
         config.torch_weights = str(get_project_root().joinpath(config.torch_weights))
 
     exporter.load_checkpoints(config.torch_weights, config.model_configuration)
-    executor = get_object(config.executor.module, config.executor.cls)(config)
+    executor = get_object(config.executor.module_path, config.executor.class_name)(config)
 
     for backend in config.formats:
         exporter.convert(backend)

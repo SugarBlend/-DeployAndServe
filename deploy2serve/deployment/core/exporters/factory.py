@@ -11,6 +11,7 @@ from deploy2serve.deployment.models.export import Backend, ExportConfig
 class Exporter(ABC):
     def __init__(self, config: ExportConfig) -> None:
         self.config: ExportConfig = config
+
         self.export_factory = ExporterFactory()
         self.model: Optional[torch.nn.Module] = None
         self.onnx_patch = nullcontext

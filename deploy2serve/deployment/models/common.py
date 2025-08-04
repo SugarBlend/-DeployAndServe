@@ -27,6 +27,6 @@ class Plugin(BaseModel):
     options: Dict[str, Any] = Field(description="Additional settings for plugin")
 
 
-class OverrideFunctionality(BaseModel):
-    module: str = Field(description="Way to module which consider override class.")
-    cls: str = Field(description="Class which consist of overrides under basic functionality.")
+class OverrideClassSpec(BaseModel):
+    module_path: str = Field(description="Dot-path to the module containing the override class.")
+    class_name: str = Field(description="Name of the class implementing the override logic.")

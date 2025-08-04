@@ -9,7 +9,7 @@ import h5py
 
 from deploy2serve.deployment.core.exporters.calibration.dataset.interface import ChunkedDataset
 
-
+#TODO: not tested
 class HDF5ChunkedDataset(ChunkedDataset):
     def __init__(self, destination_folder: Union[str, Path], group_name: str) -> None:
         super().__init__()
@@ -46,7 +46,7 @@ class HDF5ChunkedDataset(ChunkedDataset):
         path: Union[str, Path],
         group_name: str,
         chunk_size: int = 1024
-    ):
+    ) -> None:
         array = tensor.cpu().numpy()
         with h5py.File(str(path), "a") as f:
             if group_name in f:

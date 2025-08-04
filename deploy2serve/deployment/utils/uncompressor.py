@@ -1,4 +1,4 @@
-from typing import Dict, Callable, Union, List, Optional
+from typing import Dict, Callable, Union, List
 from pathlib import Path, PurePosixPath
 
 
@@ -45,6 +45,7 @@ def uncompress_7z(archive_path: str, output_dir: str) -> None:
     import py7zr
     with py7zr.SevenZipFile(archive_path, mode='r') as z:
         z.extractall(path=output_dir)
+        # TODO: extend to search root directory into extracted archive
 
 
 @Uncompress.register([".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz", ".tar.xz", ".txz"])
@@ -52,3 +53,4 @@ def uncompress_tar(archive_path: str, output_dir: str) -> None:
     import tarfile
     with tarfile.open(archive_path, "r:*") as tar:
         tar.extractall(path=output_dir)
+        # TODO: extend to search root directory into extracted archive

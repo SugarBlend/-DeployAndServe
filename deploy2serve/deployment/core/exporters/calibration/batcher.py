@@ -8,7 +8,7 @@ from roboflow import Roboflow
 from math import ceil
 import torch
 from torch.utils.data import DataLoader
-from typing import Generator, Optional, Any, Tuple, Type
+from typing import Generator, Optional, Any, Tuple, Type, Union
 
 from deploy2serve.deployment.core.exporters.calibration.cache.lru import LRUChunkCache
 from deploy2serve.deployment.core.exporters.calibration.dataset.interface import ChunkedDataset
@@ -43,13 +43,13 @@ class BaseBatcher(ABC):
         def regenerate_dataset() -> None:
             self._check_calibration_dataset()
             generator_info = self.config.tensorrt.dataset.labels_generator
-            generator = getattr(import_module(generator_info.module), generator_info.cls)(self.dataset_folder)
+            generator = getattr(import_module(generator_info.module_path), generator_info.class_name)(self.dataset_folder)
             labels = generator.generate_labels()
             dataset.create_dataset_file(lambda args: self.transformation(*args), list(zip(*labels.values())))
 
         storage_info = self.config.tensorrt.dataset.data_storage
-        cls: Type[ChunkedDataset] = getattr(import_module(storage_info.module), storage_info.cls)
-        dataset: ChunkedDataset = cls(self.dataset_folder, dataset_name)
+        cls: Type[ChunkedDataset] = getattr(import_module(storage_info.module_path), storage_info.class_name)
+        dataset: Type[ChunkedDataset] = cls(self.dataset_folder, dataset_name)
 
         if dataset.filename.exists():
             dataset.from_file()
@@ -64,13 +64,14 @@ class BaseBatcher(ABC):
         images = list(self.dataset_folder.joinpath("images").glob("*"))
         annotations = list(self.dataset_folder.joinpath("annotations").glob("*"))
 
-        if any((not self.dataset_folder.exists(), not len(images), not len(annotations))):
+        if not self.dataset_folder.exists() or not images or not annotations:
             if self.dataset_folder.exists():
                 for path in self.dataset_folder.iterdir():
                     path.unlink()
 
             dataset = self.config.tensorrt.dataset.description
             if isinstance(dataset, RoboflowDataset):
+                # TODO: Not tested
                 api = Roboflow(api_key=dataset.api_key)
                 project = api.workspace(dataset.workspace).project(dataset.project_id)
                 project = project.version(dataset.version_number)
@@ -96,7 +97,7 @@ class BaseBatcher(ABC):
     def transformation(self, *args, **kwargs) -> Any:
         pass
 
-    def get_batch(self) -> Generator[np.ndarray, None, None]:
+    def get_batch(self) -> Generator[torch.Tensor, Any, None]:
         for idx, batch in enumerate(self.dataloader):
             if self.config.tensorrt.dataset.calibration_frames and idx > ceil(self.total_frames / self.batch_size):
                 return None

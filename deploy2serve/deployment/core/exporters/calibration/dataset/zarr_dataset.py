@@ -46,7 +46,7 @@ class ZarrChunkedDataset(ChunkedDataset):
         path: Union[str, Path],
         group_name: str,
         chunk_size: int = 128
-    ):
+    ) -> None:
         array = tensor.cpu().numpy()
         storage = zarr.open(path, mode="a")
 

@@ -5,7 +5,7 @@ import torch.cuda
 import yaml
 from pydantic import BaseModel, Field, field_validator
 
-from deploy2serve.deployment.models.common import Backend, OverrideFunctionality
+from deploy2serve.deployment.models.common import Backend, OverrideClassSpec
 from deploy2serve.deployment.models.backends.onnx_opts import OnnxConfig
 from deploy2serve.deployment.models.backends.openvino_opts import OpenVINOConfig
 from deploy2serve.deployment.models.backends.tensorrt_opts import TensorrtConfig
@@ -26,8 +26,8 @@ class ExportConfig(BaseModel):
     enable_benchmark: bool = Field(default=True, description="Launch benchmarks for every export format.")
     enable_visualization: bool = Field(default=True, description="Launch visualization results after every export.")
 
-    exporter: OverrideFunctionality = Field(description="A structure describing a 'Exporter' by module and class name.")
-    executor: OverrideFunctionality = Field(description="A structure describing a 'Executor' by module and class name.")
+    exporter: OverrideClassSpec = Field(description="A structure describing a 'Exporter' by module and class name.")
+    executor: OverrideClassSpec = Field(description="A structure describing a 'Executor' by module and class name.")
 
     tensorrt: TensorrtConfig = Field(
         description="Config file which consider parameters for convertation to tensorrt format."

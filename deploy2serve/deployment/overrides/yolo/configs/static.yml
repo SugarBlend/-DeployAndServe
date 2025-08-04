@@ -2,8 +2,8 @@ torch_weights: weights/pytorch/yolo12m.pt
 model_configuration: null
 
 formats:
-#  - openvino
-#  - torchscript
+  - openvino
+  - torchscript
   - onnx
   - tensorrt
 enable_mixed_precision: true

@@ -1,7 +1,7 @@
 from typing import List, Optional, Union
 from pydantic import BaseModel, Field
 
-from deploy2serve.deployment.models.common import OverrideFunctionality
+from deploy2serve.deployment.models.common import OverrideClassSpec
 
 
 class RoboflowDataset(BaseModel):
@@ -28,10 +28,10 @@ class Dataset(BaseModel):
     exclude_frames: List[int] = Field(default=[],
                                       description="A set of image serial numbers that must be excluded from the "
                                                   "calibration stage in case of an unexpected error.")
-    labels_generator: OverrideFunctionality = Field(description="A structure describing a 'LabelsGenerator' by module "
-                                                                "and class name.")
-    data_storage: OverrideFunctionality = Field(description="A structure describing a 'ChunkedDataset' by module and "
-                                                            "class name.")
+    labels_generator: OverrideClassSpec = Field(description="A structure describing a 'LabelsGenerator' by module "
+                                                            "and class name.")
+    data_storage: OverrideClassSpec = Field(description="A structure describing a 'ChunkedDataset' by module and "
+                                                        "class name.")
 
     class Config:
         arbitrary_types_allowed = True

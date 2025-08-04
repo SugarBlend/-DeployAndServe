@@ -9,6 +9,7 @@ from tqdm import tqdm
 from deploy2serve.deployment.core.exporters.calibration.batcher import BaseBatcher
 from deploy2serve.deployment.models.export import TensorrtConfig
 from deploy2serve.utils.logger import get_logger
+from deploy2serve.deployment.utils.progress_utils import get_progress_options
 
 
 class EngineCalibrator(trt.IInt8Calibrator):
@@ -45,7 +46,7 @@ class EngineCalibrator(trt.IInt8Calibrator):
 
         if self.progress_bar is None and self.config.specific.log_level.value < 3:
             total = ceil(self.image_batcher.total_frames / self.image_batcher.batch_size)
-            self.progress_bar = tqdm(total=total, desc="INT8 Calibration")
+            self.progress_bar = tqdm(total=total, desc="INT8 Calibration", **get_progress_options())
 
         try:
             batch = next(self.batch_generator)

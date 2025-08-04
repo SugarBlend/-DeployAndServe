@@ -1,14 +1,16 @@
 from pathlib import Path
-from typing import Any, List, Optional, Sequence, Tuple, Union
+from typing import Any, List, Optional, Sequence, Tuple, Union, Dict
 
 import numpy as np
 import onnxruntime as ort
 import torch
 
-from deploy2serve.deployment.core.executors.base import BaseExecutor, ExportConfig
+from deploy2serve.deployment.core.executors.base import BaseExecutor, ExportConfig, ExecutorFactory
+from deploy2serve.deployment.models.common import Backend
 from deploy2serve.utils.logger import get_project_root
 
 
+@ExecutorFactory.register(Backend.ONNX)
 class ORTExecutor(BaseExecutor):
     def __init__(self, config: ExportConfig) -> None:
         super(ORTExecutor, self).__init__(config)
@@ -35,18 +37,32 @@ class ORTExecutor(BaseExecutor):
 
     @staticmethod
     def load(
-        onnx_path: Union[str, Path],
+        weights_path: Union[str, Path],
         sess_options: Optional[ort.SessionOptions],
-        providers: Optional[Sequence[str | tuple[str, dict[Any, Any]]]],
-        provider_options: Optional[Sequence[dict[Any, Any]]],
+        providers: Optional[Sequence[Union[str, Tuple[str, Dict[Any, Any]]]]],
+        provider_options: Optional[Sequence[Dict[Any, Any]]],
     ) -> Tuple[ort.InferenceSession, List[str], List[str]]:
-        inference_session = ort.InferenceSession(onnx_path, sess_options, providers, provider_options)
+        path = Path(weights_path)
+        if not path.exists():
+            raise FileNotFoundError(f"ONNX model file not found at: '{path}'.")
+
+        inference_session = ort.InferenceSession(weights_path, sess_options, providers, provider_options)
         input_names = [inp.name for inp in inference_session.get_inputs()]
         output_names = [out.name for out in inference_session.get_outputs()]
         return inference_session, input_names, output_names
 
-    def infer(self, image: Union[torch.Tensor, np.ndarray], **kwargs) -> List[torch.Tensor]:
-        if isinstance(image, torch.Tensor):
-            image = image.cpu().numpy()
-        outputs = self.session.run(output_names=self.output_names, input_feed={self.input_names[0]: image})
+    def infer(
+            self,
+            inputs: Union[torch.Tensor, np.ndarray, Dict[str, Union[np.ndarray, torch.Tensor]]],
+            **kwargs
+    ) -> List[torch.Tensor]:
+        if isinstance(inputs, (torch.Tensor, np.ndarray)):
+            input_feed = {self.input_names[0]: inputs.cpu().numpy() if isinstance(inputs, torch.Tensor) else inputs}
+        elif isinstance(inputs, Dict):
+            input_feed = {name: (val.cpu().numpy() if isinstance(val, torch.Tensor) else val) for name, val in
+                          inputs.items()}
+        else:
+            raise TypeError(f"Unsupported input type {type(inputs)}")
+
+        outputs = self.session.run(output_names=self.output_names, input_feed=input_feed)
         return [torch.from_numpy(output).to(self.config.device) for output in outputs]

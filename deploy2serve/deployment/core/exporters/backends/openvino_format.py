@@ -43,12 +43,11 @@ class OpenVINOExporter(BaseExporter):
 
         self.logger.info("Try convert PyTorch model to OpenVINO model")
         model = deepcopy(self.model)
-        options: Optional[Dict[str, Tuple[Tuple[int, ...], ov.Type]]] = None
         layer_info = next(model.parameters())
         dummy_input = torch.zeros((1, 3, *self.config.input_shape), dtype=layer_info.dtype, device=layer_info.device)
         for _ in range(10):
             model(dummy_input)
-        ov_model = ov.convert_model(model, input=options, example_input=dummy_input)
+        ov_model = ov.convert_model(model, example_input=dummy_input)
         compress_to_fp16 = self.config.openvino.precision == Precision.FP16 or self.config.enable_mixed_precision
         ov.save_model(ov_model, self.save_path, compress_to_fp16)
         self.logger.info(f"OpenVINO model successfully stored in: {self.save_path}")

@@ -29,15 +29,19 @@ class ExporterFactory(object):
 
     @classmethod
     def register(cls, backend: Backend):
-        def decorator(executor_cls: Type[BaseExporter]):
-            cls._registry[backend] = executor_cls
-            return executor_cls
+        def decorator(exporter_cls: Type[BaseExporter]):
+            cls._registry[backend] = exporter_cls
+            return exporter_cls
 
         return decorator
 
     @classmethod
+    def is_registered(cls, backend: Backend) -> bool:
+        return backend in cls._registry
+
+    @classmethod
     def create(cls, export_type: Backend) -> Type[BaseExporter]:
-        exporter_class = cls._registry.get(export_type)
-        if not exporter_class:
+        exporter_cls = cls._registry.get(export_type)
+        if not exporter_cls:
             raise ValueError(f"Unsupported exporter type: {export_type}")
-        return exporter_class
+        return exporter_cls

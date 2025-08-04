@@ -7,7 +7,7 @@ from deploy2serve.deployment.utils.progress_utils import get_progress_options
 
 
 class ChunkedDataset(ABC):
-    def __init__(self):
+    def __init__(self) -> None:
         self.length: int = 0
         self.chunk_size: Optional[int] = None
         self.progress_options: Dict[str, Any] = get_progress_options()

@@ -28,14 +28,14 @@ class ONNXExporter(BaseExporter):
     @abstractmethod
     def register_onnx_plugins(self) -> Any:
         raise NotImplementedError(
-            "This method doesn't implemented, your should create him in custom class, " "based on ExtendExporter"
+            "This method doesn't implemented, your should create him in custom class, based on 'ExtendExporter'."
         )
 
     @abstractmethod
     @contextmanager
     def patch_ops(self) -> None:
         raise NotImplementedError(
-            "This method doesn't implemented, your should create him in custom class, " "based on ExtendExporter"
+            "This method doesn't implemented, your should create him in custom class, based on 'ExtendExporter'."
         )
 
     @torch.no_grad()
