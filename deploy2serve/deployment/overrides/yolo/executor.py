@@ -10,7 +10,7 @@ from ultralytics.utils.ops import non_max_suppression, scale_boxes
 
 from deploy2serve.deployment.core.executors.factory import ExtendExecutor
 from deploy2serve.deployment.models.export import ExportConfig
-from deploy2serve.deployment.models.export.common import Plugin
+from deploy2serve.deployment.models.common import Plugin
 from deploy2serve.utils.logger import get_project_root
 
 

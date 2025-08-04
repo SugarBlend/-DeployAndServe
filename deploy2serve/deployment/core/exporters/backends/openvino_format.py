@@ -5,9 +5,10 @@ import numpy as np
 import torch
 from typing import Dict, Optional, Tuple
 
-from deploy2serve.deployment.core.exporters.base import BaseExporter, ExportConfig, timer
+from deploy2serve.deployment.core.exporters.base import BaseExporter, ExportConfig
 from deploy2serve.deployment.core.exporters.factory import ExporterFactory
-from deploy2serve.deployment.models.export import Precision, Backend
+from deploy2serve.deployment.models.common import Precision, Backend
+from deploy2serve.deployment.utils.wrappers import timer
 from deploy2serve.utils.logger import get_logger, get_project_root
 
 

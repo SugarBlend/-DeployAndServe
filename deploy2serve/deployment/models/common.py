@@ -30,4 +30,3 @@ class Plugin(BaseModel):
 class OverrideFunctionality(BaseModel):
     module: str = Field(description="Way to module which consider override class.")
     cls: str = Field(description="Class which consist of overrides under basic functionality.")
-

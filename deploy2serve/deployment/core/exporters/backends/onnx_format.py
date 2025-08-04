@@ -8,8 +8,9 @@ import onnxslim
 import torch
 from typing import Any, Dict, Optional, List
 
-from deploy2serve.deployment.core.exporters.base import BaseExporter, ExportConfig, ExporterFactory, timer
+from deploy2serve.deployment.core.exporters.base import BaseExporter, ExportConfig, ExporterFactory
 from deploy2serve.deployment.models.export import Backend
+from deploy2serve.deployment.utils.wrappers import timer
 from deploy2serve.utils.logger import get_logger, get_project_root
 
 

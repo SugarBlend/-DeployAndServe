@@ -40,16 +40,15 @@ def uncompress_zip(archive_path: str, output_dir: str) -> str:
         return str()
 
 
-# @Uncompress.register(".7z")
-# def uncompress_7z(archive_path: str, output_dir: str) -> None:
-#     import py7zr
-#     with py7zr.SevenZipFile(archive_path, mode='r') as z:
-#         z.extractall(path=output_dir)
-#         print(f'7z-архив {archive_path} успешно распакован в {output_dir}')
-#
-#
-# @Uncompress.register([".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz", ".tar.xz", ".txz"])
-# def uncompress_tar(archive_path: str, output_dir: str) -> None:
-#     import tarfile
-#     with tarfile.open(archive_path, "r:*") as tar:
-#         tar.extractall(path=output_dir)
+@Uncompress.register(".7z")
+def uncompress_7z(archive_path: str, output_dir: str) -> None:
+    import py7zr
+    with py7zr.SevenZipFile(archive_path, mode='r') as z:
+        z.extractall(path=output_dir)
+
+
+@Uncompress.register([".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz", ".tar.xz", ".txz"])
+def uncompress_tar(archive_path: str, output_dir: str) -> None:
+    import tarfile
+    with tarfile.open(archive_path, "r:*") as tar:
+        tar.extractall(path=output_dir)

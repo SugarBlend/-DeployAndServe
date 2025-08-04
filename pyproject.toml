@@ -30,6 +30,11 @@ opencv-python = ">=4.8.1.78"
 opencv-contrib-python = ">=4.8.1.78"
 openvino = "2025.2.0"
 colorlog = "6.9.0"
+zarr = "2.18.3"
+h5py = "3.14.0"
+roboflow = "1.2.3"
+gdown = "5.2.0"
+pycocotools = "2.0.10"
 
 [tool.poetry.group.formatting.dependencies]
 black = ">=25.1.0"

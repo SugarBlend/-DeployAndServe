@@ -4,8 +4,9 @@ import tensorrt as trt
 from pydantic import BaseModel, Field, field_validator
 from ultralytics.utils.checks import check_version
 
-from deploy2serve.deployment.models.export.common import Plugin, Precision, OverrideFunctionality
+from deploy2serve.deployment.models.common import Plugin, Precision
 from deploy2serve.utils.logger import get_logger, logging
+from deploy2serve.deployment.models.dataset import Dataset
 
 
 class SpecificOptions(BaseModel):
@@ -131,32 +132,6 @@ class SpecificOptions(BaseModel):
             )
             platform = None
         return platform
-
-    class Config:
-        arbitrary_types_allowed = True
-
-
-class RoboflowDataset(BaseModel):
-    name: str = Field(description="")
-    api_key: str = Field(description="")
-    workspace: str = Field(description="")
-    version_number: str = Field(description="")
-    model_format: str = Field(description="")
-    project_id: str = Field(description="")
-
-
-class StandardDataset(BaseModel):
-    name: str = Field(description="")
-    images_url: str = Field(description="")
-    annotations_url: str = Field(description="")
-
-
-class Dataset(BaseModel):
-    description: Union[StandardDataset, RoboflowDataset] = Field(description="")
-    calibration_frames: Optional[int] = Field(default=None, description="")
-    exclude_frames: List[int] = Field(default=[], description="")
-    labels_generator: OverrideFunctionality = Field()
-    data_storage: OverrideFunctionality = Field()
 
     class Config:
         arbitrary_types_allowed = True

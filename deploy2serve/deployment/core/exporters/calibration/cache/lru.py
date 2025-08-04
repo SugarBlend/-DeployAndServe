@@ -1,8 +1,10 @@
 from collections import OrderedDict
 from typing import Any
 
+from deploy2serve.deployment.core.exporters.calibration.cache.interface import ChunkCache
 
-class LRUChunkCache(object):
+
+class LRUChunkCache(ChunkCache):
     def __init__(self, max_chunks: int = 4) -> None:
         self.max_chunks: int = max_chunks
         self.cache: OrderedDict[int, Any] = OrderedDict()

@@ -1,10 +1,17 @@
 from abc import ABC, abstractmethod
-from typing import List, Any, Union
+from typing import List, Any, Union, Optional, Dict
 import torch
 from pathlib import Path
 
+from deploy2serve.deployment.utils.progress_utils import get_progress_options
+
 
 class ChunkedDataset(ABC):
+    def __init__(self):
+        self.length: int = 0
+        self.chunk_size: Optional[int] = None
+        self.progress_options: Dict[str, Any] = get_progress_options()
+
     @property
     @abstractmethod
     def filename(self) -> Path:
@@ -18,24 +25,21 @@ class ChunkedDataset(ABC):
     def get_chunk(self, chunk_idx: int) -> List[torch.Tensor]:
         pass
 
-    @abstractmethod
     def get_length(self) -> int:
-        pass
+        return self.length
 
-    @abstractmethod
     def get_chunk_size(self) -> int:
-        pass
+        return self.chunk_size
 
     @abstractmethod
     def get_data_shape(self) -> int:
         pass
 
-
-class ChunkCache(ABC):
+    @staticmethod
     @abstractmethod
-    def get(self, key: int) -> Any:
+    def to_file(*args, **kwargs) -> Any:
         pass
 
     @abstractmethod
-    def put(self, key: int, value: Any) -> None:
+    def create_dataset_file(self, *args, **kwargs) -> Any:
         pass

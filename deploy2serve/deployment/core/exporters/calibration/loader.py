@@ -2,13 +2,14 @@ import torch
 from torch.utils.data import Dataset
 from typing import Type
 
-from deploy2serve.deployment.core.exporters.calibration.dataset.interfaces import ChunkedDataset, ChunkCache
+from deploy2serve.deployment.core.exporters.calibration.dataset.interface import ChunkedDataset
+from deploy2serve.deployment.core.exporters.calibration.cache.interface import ChunkCache
 
 
 class ChunkedDatasetLoader(Dataset):
-    def __init__(self, dataset: ChunkedDataset, cache: Type[ChunkCache]) -> None:
-        self.dataset: ChunkedDataset = dataset
-        self.cache: ChunkCache = cache
+    def __init__(self, dataset: Type[ChunkedDataset], cache: Type[ChunkCache]) -> None:
+        self.dataset: Type[ChunkedDataset] = dataset
+        self.cache: Type[ChunkCache] = cache
 
         self.length: int = dataset.get_length()
         self.chunk_size: int = dataset.get_chunk_size()

@@ -1,22 +1,21 @@
 from abc import ABC, abstractmethod
+from gdown import download
 import os
-from typing import Generator, Optional, Any, Tuple, Union, Dict, List, Type
+from importlib import import_module
 import numpy as np
 from pathlib import Path
-from math import ceil
-import cv2
-import torch
-from deploy2serve.deployment.models.export import ExportConfig
-from gdown import download
-from deploy2serve.deployment.models.export.tensorrt_opts import RoboflowDataset, StandardDataset
 from roboflow import Roboflow
-from deploy2serve.deployment.core.exporters.calibration.dataset.interfaces import ChunkedDataset
-from deploy2serve.deployment.core.exporters.calibration.dataset.loader import ChunkedDatasetLoader
-from deploy2serve.deployment.core.exporters.calibration.dataset.utils import LRUChunkCache
+from math import ceil
+import torch
 from torch.utils.data import DataLoader
-from deploy2serve.deployment.core.exporters.calibration.utils import Uncompress
+from typing import Generator, Optional, Any, Tuple, Type
 
-from importlib import import_module
+from deploy2serve.deployment.core.exporters.calibration.cache.lru import LRUChunkCache
+from deploy2serve.deployment.core.exporters.calibration.dataset.interface import ChunkedDataset
+from deploy2serve.deployment.core.exporters.calibration.loader import ChunkedDatasetLoader
+from deploy2serve.deployment.models.export import ExportConfig
+from deploy2serve.deployment.models.dataset import RoboflowDataset, StandardDataset
+from deploy2serve.deployment.utils.uncompressor import Uncompress
 
 
 class BaseBatcher(ABC):
@@ -29,52 +28,46 @@ class BaseBatcher(ABC):
         self.batch_size = max([item.get("max")[0] for item in self.config.tensorrt.specific.profile_shapes])
 
         self.dataset_folder = self.root.joinpath(f"calibration_dataset/{self.config.tensorrt.dataset.description.name}")
-        dataset = self.generate_dataset_file(dataset_name)
+        dataset = self.check_dataset_file(dataset_name)
         loader = ChunkedDatasetLoader(dataset, LRUChunkCache(max_chunks=2))
-        self.dataloader = DataLoader(loader, batch_size=self.batch_size, num_workers=4, pin_memory=True)
+        self.dataloader = DataLoader(
+            loader, batch_size=self.batch_size, num_workers=4, pin_memory=True, persistent_workers=True
+        )
 
         if self.config.tensorrt.dataset.calibration_frames:
             self.total_frames = min(dataset.get_length(), self.config.tensorrt.dataset.calibration_frames)
         else:
             self.total_frames = dataset.get_length()
 
-    def generate_dataset_file(self, dataset_name: str) -> ChunkedDataset:
-        def regenerate_dataset():
-            self._is_dataset_exist()
+    def check_dataset_file(self, dataset_name: str) -> ChunkedDataset:
+        def regenerate_dataset() -> None:
+            self._check_calibration_dataset()
             generator_info = self.config.tensorrt.dataset.labels_generator
             generator = getattr(import_module(generator_info.module), generator_info.cls)(self.dataset_folder)
             labels = generator.generate_labels()
-            generator.create_dataset_file(
-                lambda args: self.transformation(*args), list(zip(*labels.values())), dataset_name
-            )
+            dataset.create_dataset_file(lambda args: self.transformation(*args), list(zip(*labels.values())))
 
-        regenerate = False
         storage_info = self.config.tensorrt.dataset.data_storage
         cls: Type[ChunkedDataset] = getattr(import_module(storage_info.module), storage_info.cls)
         dataset: ChunkedDataset = cls(self.dataset_folder, dataset_name)
 
         if dataset.filename.exists():
             dataset.from_file()
-            if not dataset.get_length():
-                regenerate = True
-
-            shape = dataset.get_data_shape()
-            if shape != self.config.input_shape:
-                regenerate = True
-
-            if regenerate:
+            if not dataset.get_length() or dataset.get_data_shape() != self.config.input_shape:
                 regenerate_dataset()
         else:
             regenerate_dataset()
+            dataset.from_file()
         return dataset
 
-    def _is_dataset_exist(self) -> bool:
+    def _check_calibration_dataset(self) -> None:
         images = list(self.dataset_folder.joinpath("images").glob("*"))
         annotations = list(self.dataset_folder.joinpath("annotations").glob("*"))
 
         if any((not self.dataset_folder.exists(), not len(images), not len(annotations))):
-            for path in self.dataset_folder.iterdir():
-                path.unlink()
+            if self.dataset_folder.exists():
+                for path in self.dataset_folder.iterdir():
+                    path.unlink()
 
             dataset = self.config.tensorrt.dataset.description
             if isinstance(dataset, RoboflowDataset):
@@ -94,9 +87,6 @@ class BaseBatcher(ABC):
                     output_file.unlink()
             else:
                 raise Exception(f"Passed unsupported type of calibration dataset: {type(self.config.tensorrt.dataset)}.")
-
-            return False
-        return True
 
     @abstractmethod
     def load_preprocess(self) -> None:

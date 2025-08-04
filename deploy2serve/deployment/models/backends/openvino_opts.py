@@ -2,7 +2,7 @@ from typing import List, Literal
 
 from pydantic import BaseModel, Field
 
-from deploy2serve.deployment.models.export.common import Precision
+from deploy2serve.deployment.models.common import Precision
 
 
 class OpenVINOConfig(BaseModel):

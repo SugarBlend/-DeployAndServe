@@ -13,6 +13,7 @@ class CocoGenerator(LabelsGenerator):
 
     def generate_labels(self) -> Dict[str, Any]:
         detections = defaultdict(list)
+        anns_by_img = defaultdict(list)
         files: List[Path] = []
 
         annotations_json = self.dataset_folder.joinpath("annotations/person_keypoints_val2017.json")
@@ -22,7 +23,6 @@ class CocoGenerator(LabelsGenerator):
 
         images_info = {img["id"]: img for img in coco.loadImgs(image_ids)}
         all_ann_ids = coco.getAnnIds(imgIds=image_ids, catIds=category_ids)
-        anns_by_img = defaultdict(list)
 
         for ann in coco.loadAnns(all_ann_ids):
             anns_by_img[ann["image_id"]].append(ann)

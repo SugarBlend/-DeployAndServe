@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 # from pathlib import Path
 from torch.onnx import _C_onnx
 
-from deploy2serve.deployment.models.export.common import Plugin
+from deploy2serve.deployment.models.common import Plugin
 
 
 class SpecificOptions(BaseModel):

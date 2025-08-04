@@ -8,10 +8,12 @@ import torch
 import tensorrt as trt
 from ultralytics.utils.checks import check_version
 
-from deploy2serve.deployment.core.exporters.base import BaseExporter, ExporterFactory, timer
+from deploy2serve.deployment.core.exporters.base import BaseExporter, ExporterFactory
 from deploy2serve.deployment.core.exporters.calibration.batcher import BaseBatcher
 from deploy2serve.deployment.core.exporters.calibration.calibrator import EngineCalibrator
-from deploy2serve.deployment.models.export import ExportConfig, Precision, Backend
+from deploy2serve.deployment.models.export import ExportConfig
+from deploy2serve.deployment.models.common import Precision, Backend
+from deploy2serve.deployment.utils.wrappers import timer
 from deploy2serve.utils.logger import get_logger, get_project_root
 
 
