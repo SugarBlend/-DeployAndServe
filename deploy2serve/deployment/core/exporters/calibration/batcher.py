@@ -2,13 +2,12 @@ from abc import ABC, abstractmethod
 from gdown import download
 import os
 from importlib import import_module
-import numpy as np
 from pathlib import Path
 from roboflow import Roboflow
 from math import ceil
 import torch
 from torch.utils.data import DataLoader
-from typing import Generator, Optional, Any, Tuple, Type, Union
+from typing import Generator, Optional, Any, Tuple, Type
 
 from deploy2serve.deployment.core.exporters.calibration.cache.lru import LRUChunkCache
 from deploy2serve.deployment.core.exporters.calibration.dataset.interface import ChunkedDataset
@@ -35,9 +34,9 @@ class BaseBatcher(ABC):
         )
 
         if self.config.tensorrt.dataset.calibration_frames:
-            self.total_frames = min(dataset.get_length(), self.config.tensorrt.dataset.calibration_frames)
+            self.total_frames = min(dataset.length, self.config.tensorrt.dataset.calibration_frames)
         else:
-            self.total_frames = dataset.get_length()
+            self.total_frames = dataset.length
 
     def check_dataset_file(self, dataset_name: str) -> ChunkedDataset:
         def regenerate_dataset() -> None:
@@ -53,7 +52,7 @@ class BaseBatcher(ABC):
 
         if dataset.filename.exists():
             dataset.from_file()
-            if not dataset.get_length() or dataset.get_data_shape() != self.config.input_shape:
+            if not dataset.length or dataset.data_shape != self.config.input_shape:
                 regenerate_dataset()
         else:
             regenerate_dataset()

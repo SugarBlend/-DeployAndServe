@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Any, Union, Optional, Dict
+from typing import List, Any, Union, Optional, Dict, Tuple
 import torch
 from pathlib import Path
 
@@ -10,6 +10,7 @@ class ChunkedDataset(ABC):
     def __init__(self) -> None:
         self.length: int = 0
         self.chunk_size: Optional[int] = None
+        self.data_shape: Optional[Tuple[int, int]] = None
         self.progress_options: Dict[str, Any] = get_progress_options()
 
     @property
@@ -21,23 +22,13 @@ class ChunkedDataset(ABC):
     def from_file(self, path: Union[str, Path] = None) -> None:
         pass
 
-    @abstractmethod
-    def get_chunk(self, chunk_idx: int) -> List[torch.Tensor]:
-        pass
-
-    def get_length(self) -> int:
-        return self.length
-
-    def get_chunk_size(self) -> int:
-        return self.chunk_size
-
-    @abstractmethod
-    def get_data_shape(self) -> int:
-        pass
-
     @staticmethod
     @abstractmethod
     def to_file(*args, **kwargs) -> Any:
+        pass
+
+    @abstractmethod
+    def get_chunk(self, chunk_idx: int) -> List[torch.Tensor]:
         pass
 
     @abstractmethod

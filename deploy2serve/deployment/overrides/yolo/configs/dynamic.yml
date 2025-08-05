@@ -53,6 +53,8 @@ tensorrt:
     data_storage:
       module_path: deploy2serve.deployment.core.exporters.calibration.dataset.zarr_dataset
       class_name: ZarrChunkedDataset
+#      module_path: deploy2serve.deployment.core.exporters.calibration.dataset.hdf5
+#      class_name: HDF5ChunkedDataset
   enable_timing_cache: true
   enable_calibration_cache: true
   output_file: weights/tensorrt/model.plan

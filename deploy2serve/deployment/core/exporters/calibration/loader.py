@@ -11,8 +11,8 @@ class ChunkedDatasetLoader(Dataset):
         self.dataset: Type[ChunkedDataset] = dataset
         self.cache: Type[ChunkCache] = cache
 
-        self.length: int = dataset.get_length()
-        self.chunk_size: int = dataset.get_chunk_size()
+        self.length: int = dataset.length
+        self.chunk_size: int = dataset.chunk_size
 
     def __len__(self) -> int:
         return self.length
