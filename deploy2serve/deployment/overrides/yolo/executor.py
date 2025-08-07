@@ -3,6 +3,7 @@ from typing import List, Tuple
 
 import cv2
 import numpy as np
+from pathlib import Path
 import torch
 from mmcv.visualization.image import imshow_det_bboxes
 from ultralytics.data.augment import LetterBox
@@ -11,7 +12,6 @@ from ultralytics.utils.ops import non_max_suppression, scale_boxes
 from deploy2serve.deployment.core.executors.factory import ExtendExecutor
 from deploy2serve.deployment.models.export import ExportConfig
 from deploy2serve.deployment.models.common import Plugin
-from deploy2serve.utils.logger import get_project_root
 
 
 class YoloExecutor(ExtendExecutor):
@@ -82,7 +82,7 @@ class YoloExecutor(ExtendExecutor):
         return boxes, scores, classes
 
     def plotter(self) -> None:
-        file_path = get_project_root().joinpath("resources/demo.jpg")
+        file_path = Path.cwd().joinpath("resources/demo.jpg")
         if not file_path.exists():
             self.logger.warning(f"Demo file is not exist: {file_path}, skip visualization step")
             image_url = "https://ultralytics.com/images/zidane.jpg"

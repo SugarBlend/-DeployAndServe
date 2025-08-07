@@ -7,7 +7,6 @@ import torch
 
 from deploy2serve.deployment.core.executors.base import BaseExecutor, ExportConfig, ExecutorFactory
 from deploy2serve.deployment.models.common import Backend
-from deploy2serve.utils.logger import get_project_root
 
 
 @ExecutorFactory.register(Backend.ONNX)
@@ -29,7 +28,7 @@ class ORTExecutor(BaseExecutor):
         }
 
         if not Path(self.config.onnx.output_file).is_absolute():
-            self.config.onnx.output_file = str(get_project_root().joinpath(self.config.onnx.output_file))
+            self.config.onnx.output_file = str(Path.cwd().joinpath(self.config.onnx.output_file))
 
         self.session, self.input_names, self.output_names = self.load(
             self.config.onnx.output_file, sess_options, ["CUDAExecutionProvider"], [provider_options]

@@ -3,13 +3,12 @@ import os
 from pathlib import Path
 import numpy as np
 import torch
-from typing import Dict, Optional, Tuple
 
 from deploy2serve.deployment.core.exporters.base import BaseExporter, ExportConfig
 from deploy2serve.deployment.core.exporters.factory import ExporterFactory
 from deploy2serve.deployment.models.common import Precision, Backend
 from deploy2serve.deployment.utils.wrappers import timer
-from deploy2serve.utils.logger import get_logger, get_project_root
+from deploy2serve.utils.logger import get_logger
 
 
 @ExporterFactory.register(Backend.OpenVINO)
@@ -18,7 +17,7 @@ class OpenVINOExporter(BaseExporter):
         super(OpenVINOExporter, self).__init__(config, model)
         self.save_path = Path(self.config.openvino.output_file)
         if not self.save_path.is_absolute():
-            self.save_path = get_project_root().joinpath(self.save_path)
+            self.save_path = Path.cwd().joinpath(self.save_path)
         self.save_path.parent.mkdir(exist_ok=True, parents=True)
         self.logger = get_logger(self.__class__.__name__)
 

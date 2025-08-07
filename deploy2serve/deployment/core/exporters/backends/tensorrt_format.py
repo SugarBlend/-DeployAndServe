@@ -14,7 +14,7 @@ from deploy2serve.deployment.core.exporters.calibration.calibrator import Engine
 from deploy2serve.deployment.models.export import ExportConfig
 from deploy2serve.deployment.models.common import Precision, Backend
 from deploy2serve.deployment.utils.wrappers import timer
-from deploy2serve.utils.logger import get_logger, get_project_root
+from deploy2serve.utils.logger import get_logger
 
 
 def get_device_info(logger: logging.Logger) -> None:
@@ -37,7 +37,7 @@ class TensorRTExporter(BaseExporter):
 
         self.save_path = Path(self.config.tensorrt.output_file)
         if not self.save_path.is_absolute():
-            self.save_path = get_project_root().joinpath(self.save_path)
+            self.save_path = Path.cwd().joinpath(self.save_path)
         cache_path = f"{self.save_path.parent}/calibration_cache/{self.save_path.stem}.cache"
         self.calibrator: EngineCalibrator = EngineCalibrator(self.config.tensorrt, cache_path)
         self.batcher: Optional[Type[BaseBatcher]] = self.register_batcher()
@@ -202,10 +202,11 @@ class TensorRTExporter(BaseExporter):
         Path(self.save_path).parent.mkdir(parents=True, exist_ok=True)
 
         if not Path(self.config.onnx.output_file).is_absolute():
-            self.config.onnx.output_file = str(get_project_root().joinpath(self.config.onnx.output_file))
+            self.config.onnx.output_file = str(Path.cwd().joinpath(self.config.onnx.output_file))
 
         if not os.path.exists(self.config.onnx.output_file):
-            raise FileNotFoundError(f"Onnx model is not found by this way: {self.config.onnx.output_file}")
+            raise FileNotFoundError(f"Onnx model is not found by this way: {self.config.onnx.output_file}. "
+                                    f"Add to pipeline before tensorrt export")
 
         logger = trt.Logger(self.config.tensorrt.specific.log_level)
         trt.init_libnvinfer_plugins(logger, namespace="")

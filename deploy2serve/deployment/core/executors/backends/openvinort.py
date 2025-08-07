@@ -6,7 +6,6 @@ import torch
 
 from deploy2serve.deployment.core.executors.base import BaseExecutor, ExportConfig, ExecutorFactory
 from deploy2serve.deployment.models.common import Backend
-from deploy2serve.utils.logger import get_project_root
 
 if TYPE_CHECKING:
     from openvino import CompiledModel
@@ -17,7 +16,7 @@ class OpenVINORTExecutor(BaseExecutor):
     def __init__(self, config: ExportConfig) -> None:
         super(OpenVINORTExecutor, self).__init__(config)
         if not Path(self.config.openvino.output_file).is_absolute():
-            self.config.openvino.output_file = str(get_project_root().joinpath(self.config.openvino.output_file))
+            self.config.openvino.output_file = str(Path.cwd().joinpath(self.config.openvino.output_file))
 
         self.compiled_model = self.load(self.config.openvino.output_file, self.config.openvino.device)
 

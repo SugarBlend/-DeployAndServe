@@ -40,6 +40,7 @@ def uncompress_zip(archive_path: str, output_dir: str) -> str:
         return str()
 
 
+# TODO: Not tested
 @Uncompress.register(".7z")
 def uncompress_7z(archive_path: str, output_dir: str) -> None:
     import py7zr
@@ -47,7 +48,7 @@ def uncompress_7z(archive_path: str, output_dir: str) -> None:
         z.extractall(path=output_dir)
         # TODO: extend to search root directory into extracted archive
 
-
+# TODO: Not tested
 @Uncompress.register([".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz", ".tar.xz", ".txz"])
 def uncompress_tar(archive_path: str, output_dir: str) -> None:
     import tarfile

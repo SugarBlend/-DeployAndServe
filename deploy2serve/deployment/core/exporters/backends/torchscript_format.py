@@ -8,7 +8,7 @@ from deploy2serve.deployment.core.exporters.base import BaseExporter, ExportConf
 from deploy2serve.deployment.core.exporters.factory import ExporterFactory
 from deploy2serve.deployment.models.export import Backend
 from deploy2serve.deployment.utils.wrappers import timer
-from deploy2serve.utils.logger import get_logger, get_project_root
+from deploy2serve.utils.logger import get_logger
 
 
 @ExporterFactory.register(Backend.TorchScript)
@@ -18,7 +18,7 @@ class TorchScriptExporter(BaseExporter):
 
         self.save_path = Path(self.config.torchscript.output_file)
         if not self.save_path.is_absolute():
-            self.save_path = get_project_root().joinpath(self.save_path)
+            self.save_path = Path.cwd().joinpath(self.save_path)
         self.save_path.parent.mkdir(exist_ok=True, parents=True)
         self.logger = get_logger(self.__class__.__name__)
 

@@ -12,7 +12,7 @@ class TorchScriptExecutor(BaseExecutor):
     def __init__(self, config: ExportConfig) -> None:
         super(TorchScriptExecutor, self).__init__(config)
         if not Path(self.config.torchscript.output_file).is_absolute():
-            self.config.torchscript.output_file = str(get_project_root().joinpath(self.config.torchscript.output_file))
+            self.config.torchscript.output_file = str(Path.cwd().joinpath(self.config.torchscript.output_file))
 
         self.scripted_model = self.load(
             self.config.torchscript.output_file, self.config.device, self.config.enable_mixed_precision

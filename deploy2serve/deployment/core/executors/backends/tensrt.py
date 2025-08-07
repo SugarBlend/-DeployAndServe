@@ -10,7 +10,6 @@ from ultralytics.utils.checks import check_version
 
 from deploy2serve.deployment.core.executors.base import BaseExecutor, ExportConfig, ExecutorFactory
 from deploy2serve.deployment.models.common import Backend
-from deploy2serve.utils.logger import get_project_root
 
 
 class Binding(BaseModel):
@@ -42,7 +41,7 @@ class TensorRTExecutor(BaseExecutor):
         super(TensorRTExecutor, self).__init__(config)
 
         if not Path(self.config.tensorrt.output_file).is_absolute():
-            self.config.tensorrt.output_file = str(get_project_root().joinpath(self.config.tensorrt.output_file))
+            self.config.tensorrt.output_file = str(Path.cwd().joinpath(self.config.tensorrt.output_file))
 
         self.bindings, self.binding_address, self.context = self.load(
             self.config.tensorrt.output_file,

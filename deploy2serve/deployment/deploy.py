@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Callable
 
 from deploy2serve.deployment.models.export import ExportConfig
-from deploy2serve.utils.logger import get_project_root
 
 
 def parse() -> Namespace:
@@ -23,7 +22,7 @@ def converter(args: Namespace) -> None:
     exporter = get_object(config.exporter.module_path, config.exporter.class_name)(config)
 
     if not Path(config.torch_weights).is_absolute():
-        config.torch_weights = str(get_project_root().joinpath(config.torch_weights))
+        config.torch_weights = str(Path.cwd().joinpath(config.torch_weights))
 
     exporter.load_checkpoints(config.torch_weights, config.model_configuration)
     executor = get_object(config.executor.module_path, config.executor.class_name)(config)
