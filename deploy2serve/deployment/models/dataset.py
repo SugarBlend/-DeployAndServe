@@ -9,7 +9,7 @@ class RoboflowDataset(BaseModel):
                                   "the converted data file.")
     api_key: str = Field(description="API key for connect Roboflow account.")
     workspace: str = Field(description="Workspace name on Roboflow platform.")
-    version_number: str = Field(description="Project name on Roboflow platform.")
+    version_number: int = Field(description="Project name on Roboflow platform.")
     model_format: str = Field(description="Version of dataset on Roboflow platform.")
     project_id: str = Field(description="Generate labels with chosen model pattern.")
 
@@ -17,8 +17,8 @@ class RoboflowDataset(BaseModel):
 class StandardDataset(BaseModel):
     name: str = Field(description="The code name of the data set, which will later be used as the section name in "
                                   "the converted data file.")
-    images_url: str = Field(description="Link to the archive containing the data set.")
-    annotations_url: str = Field(description="Link to an archive containing annotations to images.")
+    images: str = Field(description="Link to the archive containing the data set.")
+    annotations: str = Field(description="Link to an archive containing annotations to images.")
 
 
 class Dataset(BaseModel):

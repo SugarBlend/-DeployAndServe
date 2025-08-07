@@ -1,6 +1,8 @@
+import shutil
 from abc import ABC, abstractmethod
 from gdown import download
 import os
+from mmengine.config import Config
 from importlib import import_module
 from pathlib import Path
 from roboflow import Roboflow
@@ -8,6 +10,7 @@ from math import ceil
 import torch
 from torch.utils.data import DataLoader
 from typing import Generator, Optional, Any, Tuple, Type
+from urllib.parse import urlparse, unquote
 
 from deploy2serve.deployment.core.exporters.calibration.cache.lru import LRUChunkCache
 from deploy2serve.deployment.core.exporters.calibration.dataset.interface import ChunkedDataset
@@ -23,7 +26,11 @@ class BaseBatcher(ABC):
         self.shape: Tuple[int, int] = shape
 
         self.dtype: Optional[torch.dtype] = None
+
         self.root = Path(self.config.tensorrt.output_file).parents[2]
+        if not self.root.is_absolute():
+            self.root = Path.cwd().joinpath(self.root)
+
         self.batch_size = max([item.get("max")[0] for item in self.config.tensorrt.specific.profile_shapes])
 
         self.dataset_folder = self.root.joinpath(f"calibration_dataset/{self.config.tensorrt.dataset.description.name}")
@@ -60,33 +67,52 @@ class BaseBatcher(ABC):
         return dataset
 
     def _check_calibration_dataset(self) -> None:
-        images = list(self.dataset_folder.joinpath("images").glob("*"))
-        annotations = list(self.dataset_folder.joinpath("annotations").glob("*"))
+        dataset = self.config.tensorrt.dataset.description
+
+        if isinstance(dataset, RoboflowDataset):
+            images, annotations = [], []
+            roboflow_config = self.dataset_folder.joinpath("data.yaml")
+            if roboflow_config.exists():
+                dataset_config = Config.fromfile(roboflow_config)
+                for field in ["train", "val", "test"]:
+                    if hasattr(dataset_config, field):
+                        folder = Path(getattr(dataset_config, field))
+                        images = list(folder.glob("*"))
+                        annotations = list(folder.parent.joinpath("labels").glob("*"))
+                        break
+        elif isinstance(dataset, StandardDataset):
+            images = list(self.dataset_folder.joinpath("images").glob("*"))
+            annotations = list(self.dataset_folder.joinpath("annotations").glob("*"))
+        else:
+            raise Exception(f"Passed unsupported type of calibration dataset: {type(self.config.tensorrt.dataset)}.")
 
         if not self.dataset_folder.exists() or not images or not annotations:
             if self.dataset_folder.exists():
-                for path in self.dataset_folder.iterdir():
-                    path.unlink()
+                shutil.rmtree(self.dataset_folder)
 
-            dataset = self.config.tensorrt.dataset.description
             if isinstance(dataset, RoboflowDataset):
-                # TODO: Not tested
                 api = Roboflow(api_key=dataset.api_key)
                 project = api.workspace(dataset.workspace).project(dataset.project_id)
                 project = project.version(dataset.version_number)
-                project.download(dataset.model_format, self.dataset_folder)
+                project.download(dataset.model_format, str(self.dataset_folder))
             elif isinstance(dataset, StandardDataset):
                 archiver = Uncompress()
-                for folder, source in {"images": dataset.images_url, "annotations": dataset.annotations_url}.items():
-                    output_file = self.dataset_folder.joinpath(Path(source).name)
-                    output_file.parent.mkdir(parents=True, exist_ok=True)
-                    if not output_file.exists():
-                        download(url=source, quiet=False, fuzzy=True, output=str(output_file))
+
+                for folder, source in {"images": dataset.images, "annotations": dataset.annotations}.items():
+                    if source.startswith("file:/"):
+                        parsed = urlparse(source)
+                        output_file = Path(unquote(parsed.path.lstrip('/')))
+                    elif Path(source).is_dir():
+                        shutil.copytree(source, self.dataset_folder.joinpath(Path(source).name))
+                        continue
+                    else:
+                        output_file = self.dataset_folder.joinpath(Path(source).name)
+                        output_file.parent.mkdir(parents=True, exist_ok=True)
+                        if not output_file.exists():
+                            download(url=source, quiet=False, fuzzy=True, output=str(output_file))
                     root_folder: str = archiver.uncompress(output_file, output_file.parent)
                     os.rename(output_file.parent.joinpath(root_folder), output_file.parent.joinpath(folder))
                     output_file.unlink()
-            else:
-                raise Exception(f"Passed unsupported type of calibration dataset: {type(self.config.tensorrt.dataset)}.")
 
     @abstractmethod
     def load_preprocess(self) -> None:
