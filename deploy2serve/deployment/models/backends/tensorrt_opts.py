@@ -146,7 +146,7 @@ class TensorrtConfig(BaseModel):
         default=True,
         description="Enable cache for faster rebuild in next launch of the same model with int builder precision.",
     )
-    dataset: Dataset = Field(description="")
+    dataset: Optional[Dataset] = Field(default=None, description="")
     plugins: List[Plugin] = Field(default=[], description="List of plugins, which can be connect to model.")
     force_rebuild: bool = Field(default=False, description="Forcefully rebuild the existing model.")
     output_file: str = Field(default="weights/tensorrt/model.plan", description="Path to save converted model.")

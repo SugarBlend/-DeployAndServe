@@ -3,7 +3,7 @@ from abc import abstractmethod
 import os
 from pathlib import Path
 from typing import Any, List, Optional, Tuple, Type
-
+import sys
 import torch
 import tensorrt as trt
 from ultralytics.utils.checks import check_version
@@ -39,8 +39,10 @@ class TensorRTExporter(BaseExporter):
         if not self.save_path.is_absolute():
             self.save_path = Path.cwd().joinpath(self.save_path)
         cache_path = f"{self.save_path.parent}/calibration_cache/{self.save_path.stem}.cache"
-        self.calibrator: EngineCalibrator = EngineCalibrator(self.config.tensorrt, cache_path)
-        self.batcher: Optional[Type[BaseBatcher]] = self.register_batcher()
+
+        if self.config.tensorrt.specific.precision in [trt.BuilderFlag.INT4, trt.BuilderFlag.INT8]:
+            self.calibrator: EngineCalibrator = EngineCalibrator(self.config.tensorrt, cache_path)
+            self.batcher: Optional[Type[BaseBatcher]] = self.register_batcher()
         self.logger = get_logger(self.__class__.__name__)
 
     @abstractmethod
@@ -112,10 +114,8 @@ class TensorRTExporter(BaseExporter):
         logger: trt.Logger
     ) -> Tuple[trt.IBuilderConfig, trt.Builder]:
         config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, self.config.tensorrt.specific.workspace)
-        config.profiling_verbosity = self.config.tensorrt.specific.profiling_verbosity
-
-        # if check_version(trt.__version__, ">8.6.1"):
-        #     config.max_aux_streams = self.config.tensorrt.specific.max_aux_streams
+        if self.config.tensorrt.specific.profiling_verbosity:
+            config.profiling_verbosity = self.config.tensorrt.specific.profiling_verbosity
         config.avg_timing_iterations = 8
 
         if check_version(trt.__version__, ">=9.1.0"):
@@ -123,6 +123,14 @@ class TensorRTExporter(BaseExporter):
                 config.runtime_platform = self.config.tensorrt.specific.runtime_platform
             if self.config.tensorrt.specific.compatibility_level:
                 config.hardware_compatibility_level = self.config.tensorrt.specific.compatibility_level
+            if not sys.stdout.isatty():
+                self.logger.warning(
+                    "App should be run from an interactive terminal in order to showcase the progress monitor "
+                    "correctly.",
+                )
+            else:
+                from deploy2serve.deployment.utils.tensorrt_progress import ProgressMonitor  # noqa: PLC0415
+                config.progress_monitor = ProgressMonitor()
 
         if self.config.tensorrt.specific.tactics and len(self.config.tensorrt.specific.tactics):
             tactics: int = 0
@@ -213,7 +221,6 @@ class TensorRTExporter(BaseExporter):
         builder = trt.Builder(logger)
         config = builder.create_builder_config()
         network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
-        network = self.register_tensorrt_plugins(network)
 
         with open(self.config.onnx.output_file, "rb") as file, trt.OnnxParser(network, logger) as parser:
             if not parser.parse(file.read()):
@@ -223,5 +230,6 @@ class TensorRTExporter(BaseExporter):
 
         config = self._add_optimization_profiles(builder, config, network, logger)
         config, builder = self._apply_builder_flags(builder, config, logger)
+        network = self.register_tensorrt_plugins(network)
         self.log_network_io_info(network, logger)
         self._store_files(builder, config, network)

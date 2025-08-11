@@ -4,7 +4,7 @@ model_configuration: null
 formats:
   - onnx
   - tensorrt
-enable_mixed_precision: true
+enable_mixed_precision: false
 input_shape: [384, 640]
 device: cuda:0
 repeats: 1000
@@ -12,11 +12,11 @@ enable_benchmark: true
 enable_visualization: true
 
 exporter:
-  module: deploy2serve.deployment.overrides.yolo.export
-  cls: YoloExporter
+  module_path: deploy2serve.deployment.overrides.yolo.export
+  class_name: YoloExporter
 executor:
-  module: deploy2serve.deployment.overrides.yolo.executor
-  cls: YoloExecutor
+  module_path: deploy2serve.deployment.overrides.yolo.executor
+  class_name: YoloExecutor
 
 tensorrt:
   plugins:

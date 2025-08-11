@@ -1,4 +1,4 @@
-torch_weights: ./weights/pytorch/yolo12m.pt
+torch_weights: weights/pytorch/yolo12m.pt
 model_configuration: null
 
 formats:

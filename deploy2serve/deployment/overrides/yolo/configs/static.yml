@@ -14,11 +14,11 @@ enable_benchmark: true
 enable_visualization: true
 
 exporter:
-  module: deploy2serve.deployment.overrides.yolo.export
-  cls: YoloExporter
+  module_path: deploy2serve.deployment.overrides.yolo.export
+  class_name: YoloExporter
 executor:
-  module: deploy2serve.deployment.overrides.yolo.executor
-  cls: YoloExecutor
+  module_path: deploy2serve.deployment.overrides.yolo.executor
+  class_name: YoloExecutor
 
 tensorrt:
   specific:
@@ -43,16 +43,16 @@ tensorrt:
   dataset:
     description:
       name: coco
-      images_url: "http://images.cocodataset.org/zips/val2017.zip"
-      annotations_url: "http://images.cocodataset.org/annotations/annotations_trainval2017.zip"
+      images: "http://images.cocodataset.org/zips/val2017.zip"
+      annotations: "http://images.cocodataset.org/annotations/annotations_trainval2017.zip"
     calibration_frames: null
     exclude_frames: []
     labels_generator:
-      module: deploy2serve.deployment.core.exporters.calibration.generators.coco
-      cls: CocoGenerator
+      module_path: deploy2serve.deployment.core.exporters.calibration.generators.coco
+      class_name: CocoGenerator
     data_storage:
-      module: deploy2serve.deployment.core.exporters.calibration.dataset.zarr_dataset
-      cls: ZarrChunkedDataset
+      module_path: deploy2serve.deployment.core.exporters.calibration.dataset.zarr_dataset
+      class_name: ZarrChunkedDataset
   enable_timing_cache: true
   enable_calibration_cache: true
   output_file: weights/tensorrt/model.plan

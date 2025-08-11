@@ -29,12 +29,18 @@ class ExportConfig(BaseModel):
     exporter: OverrideClassSpec = Field(description="A structure describing a 'Exporter' by module and class name.")
     executor: OverrideClassSpec = Field(description="A structure describing a 'Executor' by module and class name.")
 
-    tensorrt: TensorrtConfig = Field(
-        description="Config file which consider parameters for convertation to tensorrt format."
+    tensorrt: Optional[TensorrtConfig] = Field(
+        default=None, description="Config file which consider parameters for convertation to tensorrt format."
     )
-    onnx: OnnxConfig = Field(description="Config file which consider parameters for convertation to onnx format.")
-    torchscript: TorchScriptConfig = Field(description="Configuration for TorchScript format convertation.")
-    openvino: OpenVINOConfig = Field(description="Configuration for OpenVINO format convertation.")
+    onnx: Optional[OnnxConfig] = Field(
+        default=None, description="Config file which consider parameters for convertation to onnx format."
+    )
+    torchscript: Optional[TorchScriptConfig] = Field(
+        default=None, description="Configuration for TorchScript format convertation."
+    )
+    openvino: Optional[OpenVINOConfig] = Field(
+        default=None, description="Configuration for OpenVINO format convertation."
+    )
 
     @field_validator("device", mode="before")
     def parse_device(cls, val: str) -> str:
