@@ -8,8 +8,8 @@ import torch
 from pydantic import BaseModel, Field
 from ultralytics.utils.checks import check_version
 
-from deploy2serve.deployment.core.executors.base import BaseExecutor, ExportConfig
-from deploy2serve.utils.logger import get_project_root
+from deploy2serve.deployment.core.executors.base import BaseExecutor, ExportConfig, ExecutorFactory
+from deploy2serve.deployment.models.common import Backend
 
 
 class Binding(BaseModel):
@@ -35,12 +35,13 @@ class Binding(BaseModel):
         arbitrary_types_allowed = True
 
 
+@ExecutorFactory.register(Backend.TensorRT)
 class TensorRTExecutor(BaseExecutor):
     def __init__(self, config: ExportConfig) -> None:
         super(TensorRTExecutor, self).__init__(config)
 
         if not Path(self.config.tensorrt.output_file).is_absolute():
-            self.config.tensorrt.output_file = str(get_project_root().joinpath(self.config.tensorrt.output_file))
+            self.config.tensorrt.output_file = str(Path.cwd().joinpath(self.config.tensorrt.output_file))
 
         self.bindings, self.binding_address, self.context = self.load(
             self.config.tensorrt.output_file,
@@ -55,12 +56,21 @@ class TensorRTExecutor(BaseExecutor):
                 break
 
     @staticmethod
+    def _make_binding(name: str, dtype: type, shape: List[int], io_mode: str, device: str) -> Binding:
+        tensor = torch.from_numpy(np.empty(shape, dtype=np.dtype(dtype))).to(torch.device(device))
+        return Binding(name=name, dtype=dtype, shape=shape, data=tensor, ptr=int(tensor.data_ptr()), io_mode=io_mode)
+
+    @staticmethod
     def load(
-        engine_path: Union[str, Path], max_batch: int, device: str, log_level: trt.Logger.Severity = trt.Logger.ERROR
+        weights_path: Union[str, Path], max_batch: int, device: str, log_level: trt.Logger.Severity = trt.Logger.ERROR
     ) -> Tuple[OrderedDict[str, Binding], OrderedDict[str, int], trt.IExecutionContext]:
+        path = Path(weights_path)
+        if not path.exists():
+            raise FileNotFoundError(f"TensorRT model file not found at: '{path}'.")
+
         logger = trt.Logger(log_level)
         trt.init_libnvinfer_plugins(logger, namespace="")
-        with open(engine_path, "rb") as file, trt.Runtime(logger) as runtime:
+        with open(weights_path, "rb") as file, trt.Runtime(logger) as runtime:
             model = runtime.deserialize_cuda_engine(file.read())
         bindings = OrderedDict()
 
@@ -68,20 +78,16 @@ class TensorRTExecutor(BaseExecutor):
             for index in range(model.num_bindings):
                 name = model.get_binding_name(index)
                 dtype = trt.nptype(model.get_binding_dtype(index))
-                shape = list(model.get_binding_shape(index))
-                shape[0] = max_batch
-                data = torch.from_numpy(np.empty(shape, dtype=np.dtype(dtype))).to(device)
+                shape = (max_batch, *model.get_binding_shape(index)[1:])
                 io_mode = "input" if model.binding_is_input(index) else "output"
-                bindings[name] = Binding(name, dtype, shape, data, int(data.data_ptr()), io_mode)
+                bindings[name] = TensorRTExecutor._make_binding(name, dtype, shape, io_mode, device)
         elif check_version(trt.__version__, ">9.1.0"):
             for index in range(model.num_io_tensors):
                 name = model.get_tensor_name(index)
                 dtype = trt.nptype(model.get_tensor_dtype(name))
-                shape = list(model.get_tensor_shape(name))
-                shape[0] = max_batch
-                data = torch.from_numpy(np.zeros(shape, dtype=np.dtype(dtype))).to(torch.device(device))
+                shape = (max_batch, *model.get_tensor_shape(name)[1:])
                 io_mode = "input" if model.get_tensor_mode(name) == trt.TensorIOMode.INPUT else "output"
-                bindings[name] = Binding(name, dtype, shape, data, int(data.data_ptr()), io_mode)
+                bindings[name] = TensorRTExecutor._make_binding(name, dtype, shape, io_mode, device)
         else:
             raise NotImplementedError(f"Your version of TensorRT: {trt.__version__} is not implemented")
 
@@ -103,4 +109,5 @@ class TensorRTExecutor(BaseExecutor):
             self.context.execute_async_v3(self.async_stream.cuda_stream)
         else:
             self.context.execute_v2(list(self.binding_address.values()))
+
         return [self.bindings[node].data for node in self.bindings if self.bindings[node].io_mode == "output"]

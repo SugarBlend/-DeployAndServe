@@ -1,4 +1,4 @@
-# 🔬 Experiments with Model Serving Technologies
+# Experiments with Model Serving Technologies
 
 This repository contains examples of working with models across various computer vision (CV) domains.  
 It also provides reusable patterns for assembling models in different formats, which serve as the foundation for containerized deployment workflows.

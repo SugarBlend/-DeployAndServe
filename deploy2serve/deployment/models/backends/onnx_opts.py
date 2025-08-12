@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 # from pathlib import Path
 from torch.onnx import _C_onnx
 
-from deploy2serve.deployment.models.export.common import Plugin
+from deploy2serve.deployment.models.common import Plugin
 
 
 class SpecificOptions(BaseModel):
@@ -31,6 +31,7 @@ class SpecificOptions(BaseModel):
     training: Union[str, _C_onnx.TrainingMode] = Field(default=_C_onnx.TrainingMode.EVAL, description="Model mode.")
     do_constant_folding: bool = Field(default=True, description="Whether to execute constant folding for optimization.")
 
+    # TODO: Not yet tested on linux platform
     # dynamo export
     # dynamo: bool = Field(default=False, description="Whether to export the model with torch.export ExportedProgram "
     #                                                 "instead of TorchScript.")

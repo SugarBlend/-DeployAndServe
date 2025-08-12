@@ -4,17 +4,11 @@ from pathlib import Path
 from typing import Callable
 
 from deploy2serve.deployment.models.export import ExportConfig
-from deploy2serve.utils.logger import get_project_root
 
 
 def parse() -> Namespace:
     parser = ArgumentParser()
-    parser.add_argument(
-        "--deploy_config",
-        default="overrides/yolo/configs/efficient_nms.yml",
-        type=str,
-        help="Way for deploy configuration.",
-    )
+    parser.add_argument("--deploy_config", default="overrides/yolo/configs/dynamic.yml", type=str, help="Way for deploy configuration.")
     return parser.parse_args()
 
 
@@ -25,13 +19,13 @@ def get_object(module_name: str, cls_name: str) -> Callable:
 def converter(args: Namespace) -> None:
     config = ExportConfig.from_file(args.deploy_config)
 
-    exporter = get_object(config.exporter.module, config.exporter.cls)(config)
+    exporter = get_object(config.exporter.module_path, config.exporter.class_name)(config)
 
     if not Path(config.torch_weights).is_absolute():
-        config.torch_weights = str(get_project_root().joinpath(config.torch_weights))
+        config.torch_weights = str(Path.cwd().joinpath(config.torch_weights))
 
-    exporter.load_checkpoints(config.torch_weights)
-    executor = get_object(config.executor.module, config.executor.cls)(config)
+    exporter.load_checkpoints(config.torch_weights, config.model_configuration)
+    executor = get_object(config.executor.module_path, config.executor.class_name)(config)
 
     for backend in config.formats:
         exporter.convert(backend)

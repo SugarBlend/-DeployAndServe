@@ -1,14 +1,15 @@
 import os
 from pathlib import Path
-from typing import Generator, List, Optional
-
+from math import ceil
+from typing import Generator, List, Optional, Type
 import tensorrt as trt
 import torch
 from tqdm import tqdm
 
-from deploy2serve.deployment.core.exporters.calibration.base_batcher import BaseBatcher
+from deploy2serve.deployment.core.exporters.calibration.batcher import BaseBatcher
 from deploy2serve.deployment.models.export import TensorrtConfig
 from deploy2serve.utils.logger import get_logger
+from deploy2serve.deployment.utils.progress_utils import get_progress_options
 
 
 class EngineCalibrator(trt.IInt8Calibrator):
@@ -22,15 +23,15 @@ class EngineCalibrator(trt.IInt8Calibrator):
         self.algorithm = self.config.specific.algorithm
 
         self.progress_bar: Optional[tqdm] = None
-        self.image_batcher: Optional[BaseBatcher] = None
+        self.image_batcher: Optional[Type[BaseBatcher]] = None
         self.batch_tensor: Optional[torch.Tensor] = None
         self.batch_generator: Optional[Generator[torch.Tensor]] = None
 
-        self.logger = get_logger("export_calibrator")
+        self.logger = get_logger(self.__class__.__name__)
         self.cache_path = Path(cache_path)
         self.cache_path.parent.mkdir(parents=True, exist_ok=True)
 
-    def set_image_batcher(self, image_batcher: BaseBatcher) -> None:
+    def set_image_batcher(self, image_batcher: Type[BaseBatcher]) -> None:
         self.image_batcher = image_batcher
         self.batch_generator = self.image_batcher.get_batch()
 
@@ -44,7 +45,8 @@ class EngineCalibrator(trt.IInt8Calibrator):
             return None
 
         if self.progress_bar is None and self.config.specific.log_level.value < 3:
-            self.progress_bar = tqdm(total=len(self.image_batcher.files), desc="INT8 Calibration")
+            total = ceil(self.image_batcher.total_frames / self.image_batcher.batch_size)
+            self.progress_bar = tqdm(total=total, desc="INT8 Calibration", **get_progress_options())
 
         try:
             batch = next(self.batch_generator)

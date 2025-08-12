@@ -1,4 +1,6 @@
-torch_weights: ./weights/pytorch/yolo12m.pt
+torch_weights: weights/pytorch/yolo12m.pt
+model_configuration: null
+
 formats:
   - openvino
   - torchscript
@@ -11,17 +13,17 @@ repeats: 1000
 enable_benchmark: true
 enable_visualization: true
 
-executor:
-  module: deploy2serve.deployment.overrides.yolo.executor
-  cls: YoloExecutor
 exporter:
-  module: deploy2serve.deployment.overrides.yolo.export
-  cls: YoloExporter
+  module_path: deploy2serve.deployment.overrides.yolo.export
+  class_name: YoloExporter
+executor:
+  module_path: deploy2serve.deployment.overrides.yolo.executor
+  class_name: YoloExecutor
 
 tensorrt:
   specific:
-    log_level: INFO
-    precision: fp16
+    log_level: ERROR
+    precision: int8
     profile_shapes:
       - min: [1, 3, 384, 640]
         opt: [4, 3, 384, 640]
@@ -30,7 +32,7 @@ tensorrt:
     flags:
       - TF32
       - DIRECT_IO
-      - PREFER_PRECISION_CONSTRAINTS
+#      - PREFER_PRECISION_CONSTRAINTS
       - SPARSE_WEIGHTS
     profiling_verbosity: NONE
     max_aux_streams: 4
@@ -38,6 +40,38 @@ tensorrt:
     compatibility_level: null
     tactics: null
     algorithm: ENTROPY_CALIBRATION_2
+  dataset:
+    description:
+      name: coco
+      images: "C:/Users/Alexander/Downloads/images"
+      annotations: "C:/Users/Alexander/Downloads/annotations"
+#    description:
+#      name: coco
+#      images: "file:///C:/Users/Alexander/Downloads/val2017.zip"
+#      annotations: "file:///C:/Users/Alexander/Downloads/annotations_trainval2017.zip"
+#    description:
+#      name: coco
+#      images: "http://images.cocodataset.org/zips/val2017.zip"
+#      annotations: "http://images.cocodataset.org/annotations/annotations_trainval2017.zip"
+#    description:
+#      name: roboflow
+#      api_key: $API_KEY
+#      workspace: roboflow-gw7yv
+#      version_number: 2
+#      model_format: yolov5
+#      project_id: raccoon
+    calibration_frames: null
+    exclude_frames: [ ]
+    labels_generator:
+      module_path: deploy2serve.deployment.core.exporters.calibration.generators.coco
+      class_name: CocoGenerator
+#      module_path: deploy2serve.deployment.core.exporters.calibration.generators.roboflow
+#      class_name: RoboflowGenerator
+    data_storage:
+      module_path: deploy2serve.deployment.core.exporters.calibration.dataset.zarr_dataset
+      class_name: ZarrChunkedDataset
+#      module_path: deploy2serve.deployment.core.exporters.calibration.dataset.hdf5
+#      class_name: HDF5ChunkedDataset
   enable_timing_cache: true
   enable_calibration_cache: true
   output_file: weights/tensorrt/model.plan
