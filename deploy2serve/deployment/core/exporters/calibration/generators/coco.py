@@ -12,8 +12,8 @@ class CocoGenerator(LabelsGenerator):
         super().__init__(dataset_folder)
 
     def generate_labels(self) -> Dict[str, Any]:
-        detections = defaultdict(list)
         anns_by_img = defaultdict(list)
+        detections: List[List[List[int]]] = []
         files: List[Path] = []
 
         annotations_json = self.dataset_folder.joinpath("annotations/person_keypoints_val2017.json")
@@ -34,11 +34,12 @@ class CocoGenerator(LabelsGenerator):
             if not anns:
                 continue
 
-            stem = Path(img_info["file_name"]).stem
+            bboxes = []
             for ann in anns:
                 x1, y1, w, h = ann["bbox"]
-                detections[stem].append([x1, y1, x1 + w, y1 + h])
+                bboxes.append([x1, y1, x1 + w, y1 + h])
 
+            detections.append(bboxes)
             files.append(self.dataset_folder.joinpath(f"images/{img_info['file_name']}"))
         self.logger.debug(f"Labels successfully fetched, length of dataset: {len(files)}.")
         return {"files": files, "detections": detections}

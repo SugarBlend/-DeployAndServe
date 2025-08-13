@@ -25,7 +25,8 @@ class ZarrChunkedDataset(ChunkedDataset):
         self.storage = zarr.open(str(self.path), mode="r")
         self.dataset = self.storage[self.group_name]
         self.length = self.dataset.shape[0]
-        self.chunk_size = self.dataset.chunks[0] if self.dataset.chunks else 128
+        self.chunk_size = self.dataset.chunks[0] if self.dataset.chunks else 32
+        self.data_shape = self.dataset[:self.chunk_size].shape[2:]
 
     @property
     def filename(self) -> Path:
@@ -37,15 +38,12 @@ class ZarrChunkedDataset(ChunkedDataset):
         chunk = self.dataset[start: end]
         return [torch.from_numpy(item) for item in chunk]
 
-    def get_data_shape(self) -> Tuple[int, int]:
-        return self.dataset[:self.chunk_size].shape[2:]
-
     @staticmethod
     def to_file(
         tensor: torch.Tensor,
         path: Union[str, Path],
         group_name: str,
-        chunk_size: int = 128
+        chunk_size: int = 32
     ) -> None:
         array = tensor.cpu().numpy()
         storage = zarr.open(path, mode="a")
@@ -67,8 +65,8 @@ class ZarrChunkedDataset(ChunkedDataset):
             self,
             fn: Callable[[Tuple[Any, ...]], torch.Tensor],
             files: List[Tuple[Any, ...]],
-            chunk_size: int = 128,
-            batch_write_size: int = 256
+            chunk_size: int = 32,
+            batch_write_size: int = 32
     ) -> None:
         sample_tensor = fn(files[0])
         if sample_tensor.ndim == 3:
@@ -112,8 +110,12 @@ class ZarrChunkedDataset(ChunkedDataset):
                     dataset[index:index + batch.shape[0]] = batch
                     index += batch.shape[0]
                     buffer.clear()
+                    del batch
 
             if buffer:
                 batch = np.concatenate(list(buffer), axis=0)
                 dataset.resize((index + batch.shape[0], *dataset.shape[1:]))
                 dataset[index:index + batch.shape[0]] = batch
+                index += batch.shape[0]
+                buffer.clear()
+                del batch

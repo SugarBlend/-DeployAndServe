@@ -22,7 +22,7 @@ class HDF5ChunkedDataset(ChunkedDataset):
         with h5py.File(str(self.path), "r") as storage:
             dataset = storage[self.group_name]
             self.length = dataset.shape[0]
-            self.chunk_size = dataset.chunks[0] if dataset.chunks else 1024
+            self.chunk_size = dataset.chunks[0] if dataset.chunks else 32
             self.data_shape = dataset[:self.chunk_size].shape[2:]
 
     @property
@@ -41,7 +41,7 @@ class HDF5ChunkedDataset(ChunkedDataset):
         tensor: torch.Tensor,
         path: Union[str, Path],
         group_name: str,
-        chunk_size: int = 1024
+        chunk_size: int = 32
     ) -> None:
         array = tensor.cpu().numpy()
         with h5py.File(str(path), "a") as storage:
@@ -66,7 +66,7 @@ class HDF5ChunkedDataset(ChunkedDataset):
         fn: Callable[[Tuple[Any, ...]], torch.Tensor],
         files: List[Tuple[Any, ...]],
         chunk_size: int = 128,
-        batch_write_size: int = 1024
+        batch_write_size: int = 128
     ) -> None:
         sample_tensor = fn(files[0])
 
