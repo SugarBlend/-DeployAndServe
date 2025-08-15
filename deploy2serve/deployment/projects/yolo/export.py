@@ -13,8 +13,8 @@ from deploy2serve.deployment.core.exporters.backends.onnx_format import ONNXExpo
 from deploy2serve.deployment.core.exporters.backends.tensorrt_format import TensorRTExporter, ExporterFactory, Backend
 from deploy2serve.deployment.models.export import ExportConfig
 from deploy2serve.deployment.models.common import Plugin
-from deploy2serve.deployment.overrides.yolo.model import Model, WrappedModel
-from deploy2serve.deployment.overrides.yolo.batcher import DetectionBatcher
+from deploy2serve.deployment.projects.yolo.model import Model, WrappedModel
+from deploy2serve.deployment.projects.yolo.batcher import DetectionBatcher
 
 
 @ExporterFactory.register(Backend.ONNX)

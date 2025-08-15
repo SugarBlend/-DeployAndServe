@@ -11,12 +11,12 @@
   "enable_visualization": true,
 
   "executor": {
-    "module": "...",
-    "cls": "..."
+    "module_path": "...",
+    "class_name": "..."
   },
   "exporter": {
-    "module": "...",
-    "cls": "..."
+    "module_path": "...",
+    "class_name": "..."
   },
 
   "tensorrt": {

@@ -27,9 +27,31 @@ class ExtendExecutor(ABC):
     def plotter(self, *args, **kwargs) -> Any:
         pass
 
+    def _get_extra_kwargs(self, backend: Backend) -> dict:
+        if backend == Backend.TensorRT:
+            return {
+                "max_batch_size": self.config.tensorrt.specific.profile_shapes[0]["max"][0],
+                "log_level": self.config.tensorrt.specific.log_level,
+            }
+        elif backend == Backend.TorchScript:
+            return {
+                "enable_mixed_precision": self.config.enable_mixed_precision,
+            }
+        elif backend == Backend.OpenVINO:
+            return {
+                "device": self.config.openvino.device,
+            }
+        return {}
+
     def visualization(self, backend: Backend) -> None:
         self.backend = backend
-        self._executor = self.executor_factory.create(backend)(self.config)
+        kwargs = {
+            "checkpoints_path": getattr(self.config, backend.value).output_file,
+            "device": self.config.device,
+        }
+        kwargs.update(self._get_extra_kwargs(backend))
+        executor_cls = self.executor_factory.create(backend)
+        self._executor = executor_cls(**kwargs)
         self.plotter()
 
     def __getattr__(self, name: str) -> Any:

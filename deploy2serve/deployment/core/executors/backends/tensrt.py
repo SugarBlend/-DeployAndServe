@@ -8,7 +8,7 @@ import torch
 from pydantic import BaseModel, Field
 from ultralytics.utils.checks import check_version
 
-from deploy2serve.deployment.core.executors.base import BaseExecutor, ExportConfig, ExecutorFactory
+from deploy2serve.deployment.core.executors.base import BaseExecutor, ExecutorFactory
 from deploy2serve.deployment.models.common import Backend
 
 
@@ -37,19 +37,28 @@ class Binding(BaseModel):
 
 @ExecutorFactory.register(Backend.TensorRT)
 class TensorRTExecutor(BaseExecutor):
-    def __init__(self, config: ExportConfig) -> None:
-        super(TensorRTExecutor, self).__init__(config)
+    def __init__(
+        self,
+        checkpoints_path: str,
+        max_batch_size: int,
+        device: str,
+        log_level: trt.Logger.Severity
+    ) -> None:
+        self.checkpoints_path: str = checkpoints_path
+        self.max_batch_size: int = max_batch_size
+        self.log_level: trt.Logger.Severity = log_level
+        self.device: torch.device = torch.device(device)
 
-        if not Path(self.config.tensorrt.output_file).is_absolute():
-            self.config.tensorrt.output_file = str(Path.cwd().joinpath(self.config.tensorrt.output_file))
+        if not Path(self.checkpoints_path).is_absolute():
+            self.checkpoints_path = str(Path.cwd().joinpath(self.checkpoints_path))
 
         self.bindings, self.binding_address, self.context = self.load(
-            self.config.tensorrt.output_file,
-            self.config.tensorrt.specific.profile_shapes[0]["max"][0],
-            self.config.device,
-            self.config.tensorrt.specific.log_level,
+            self.checkpoints_path,
+            self.max_batch_size,
+            f"{self.device.type}:{self.device.index}",
+            self.log_level
         )
-        self.async_stream = torch.cuda.Stream(device=config.device, priority=-1)
+        self.async_stream = torch.cuda.Stream(device=self.device, priority=-1)
         for node in self.bindings:
             if self.bindings[node].io_mode == "input":
                 self.input_name = node
@@ -62,7 +71,10 @@ class TensorRTExecutor(BaseExecutor):
 
     @staticmethod
     def load(
-        weights_path: Union[str, Path], max_batch: int, device: str, log_level: trt.Logger.Severity = trt.Logger.ERROR
+        weights_path: Union[str, Path],
+        max_batch: int,
+        device: str,
+        log_level: trt.Logger.Severity = trt.Logger.ERROR
     ) -> Tuple[OrderedDict[str, Binding], OrderedDict[str, int], trt.IExecutionContext]:
         path = Path(weights_path)
         if not path.exists():

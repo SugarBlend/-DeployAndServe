@@ -2,13 +2,9 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Type
 
 from deploy2serve.deployment.models.common import Backend
-from deploy2serve.deployment.models.export import ExportConfig
 
 
 class BaseExecutor(ABC):
-    def __init__(self, config: ExportConfig):
-        self.config: ExportConfig = config
-
     @abstractmethod
     def load(self, **kwargs) -> Any:
         pass

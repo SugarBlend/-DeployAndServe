@@ -8,7 +8,7 @@ from deploy2serve.deployment.models.export import ExportConfig
 
 def parse() -> Namespace:
     parser = ArgumentParser()
-    parser.add_argument("--deploy_config", default="overrides/yolo/configs/dynamic.yml", type=str, help="Way for deploy configuration.")
+    parser.add_argument("--deploy_config", default="projects/yolo/configs/dynamic.yml", type=str, help="Way for deploy configuration.")
     return parser.parse_args()
 
 

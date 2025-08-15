@@ -24,4 +24,4 @@ services:
               capabilities: [ gpu ]
     volumes:
       - ../../../weights:/app/weights
-      - ../../../deploy2serve/deployment/overrides:/app/deploy2serve/deployment/overrides
+      - ../../../deploy2serve/deployment/projects:/app/deploy2serve/deployment/projects

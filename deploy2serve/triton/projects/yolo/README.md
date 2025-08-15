@@ -26,7 +26,7 @@ triton:
 protocol: grpc
 
 server:
-  module: deploy2serve.triton.overrides.yolo.server
+  module: deploy2serve.triton.projects.yolo.server
   cls: EnsembleYoloTriton
 
 ```
@@ -39,7 +39,7 @@ server:
 To start the bounding box marking service, run the following command:
 
 ```powershell
-python deploy2serve/triton/overrides/yolo/server.py --service_config deploy2serve/triton/overrides/yolo/configs/ensemble.yaml
+python deploy2serve/triton/projects/yolo/server.py --service_config deploy2serve/triton/projects/yolo/configs/ensemble.yaml
 ```
 
 ---
@@ -61,7 +61,7 @@ triton:
 protocol: grpc
 
 server:
-  module: deploy2serve.triton.overrides.yolo.server
+  module: deploy2serve.triton.projects.yolo.server
   cls: RegularYoloTriton
 
 ```
@@ -70,7 +70,7 @@ server:
 To start the bounding box marking service, run the following command:
 
 ```powershell
-python deploy2serve/triton/overrides/yolo/server.py --service_config deploy2serve/triton/overrides/yolo/configs/regular.yaml
+python deploy2serve/triton/projects/yolo/server.py --service_config deploy2serve/triton/projects/yolo/configs/regular.yaml
 ```
 
 ---

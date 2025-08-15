@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from math import ceil
+from math import floor
 from typing import Generator, List, Optional, Type
 import tensorrt as trt
 import torch
@@ -45,8 +45,8 @@ class EngineCalibrator(trt.IInt8Calibrator):
             return None
 
         if self.progress_bar is None and self.config.specific.log_level.value < 3:
-            total = ceil(self.image_batcher.total_frames / self.image_batcher.batch_size)
-            self.progress_bar = tqdm(total=total, desc="INT8 Calibration", **get_progress_options())
+            self.progress_bar = tqdm(total=self.image_batcher.total_frames, desc="INT8 Calibration",
+                                     **get_progress_options())
 
         try:
             batch = next(self.batch_generator)

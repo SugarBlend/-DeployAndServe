@@ -23,10 +23,11 @@ class ZarrChunkedDataset(ChunkedDataset):
         if path:
             self.path = path
         self.storage = zarr.open(str(self.path), mode="r")
-        self.dataset = self.storage[self.group_name]
-        self.length = self.dataset.shape[0]
-        self.chunk_size = self.dataset.chunks[0] if self.dataset.chunks else 32
-        self.data_shape = self.dataset[:self.chunk_size].shape[2:]
+        if hasattr(self.storage, self.group_name):
+            self.dataset = self.storage[self.group_name]
+            self.length = self.dataset.shape[0]
+            self.chunk_size = self.dataset.chunks[0] if self.dataset.chunks else 32
+            self.data_shape = self.dataset[:self.chunk_size].shape[2:]
 
     @property
     def filename(self) -> Path:

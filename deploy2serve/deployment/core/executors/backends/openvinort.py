@@ -4,7 +4,7 @@ from typing import List, Union, TYPE_CHECKING
 import numpy as np
 import torch
 
-from deploy2serve.deployment.core.executors.base import BaseExecutor, ExportConfig, ExecutorFactory
+from deploy2serve.deployment.core.executors.base import BaseExecutor, ExecutorFactory
 from deploy2serve.deployment.models.common import Backend
 
 if TYPE_CHECKING:
@@ -13,12 +13,14 @@ if TYPE_CHECKING:
 
 @ExecutorFactory.register(Backend.OpenVINO)
 class OpenVINORTExecutor(BaseExecutor):
-    def __init__(self, config: ExportConfig) -> None:
-        super(OpenVINORTExecutor, self).__init__(config)
-        if not Path(self.config.openvino.output_file).is_absolute():
-            self.config.openvino.output_file = str(Path.cwd().joinpath(self.config.openvino.output_file))
+    def __init__(self, checkpoints_path: str, device: str) -> None:
+        self.checkpoints_path: str = checkpoints_path
+        self.device: torch.device = torch.device(device.lower())
 
-        self.compiled_model = self.load(self.config.openvino.output_file, self.config.openvino.device)
+        if not Path(self.checkpoints_path).is_absolute():
+            self.checkpoints_path = str(Path.cwd().joinpath(self.checkpoints_path))
+
+        self.compiled_model = self.load(self.checkpoints_path, device)
 
     @staticmethod
     def load(weights_path: Union[str, Path], device: str) -> "CompiledModel":
@@ -44,4 +46,4 @@ class OpenVINORTExecutor(BaseExecutor):
         if isinstance(image, torch.Tensor):
             image = image.cpu().numpy()
         outputs = self.compiled_model(image)
-        return [torch.from_numpy(output).to(self.config.device) for output in outputs.values()]
+        return [torch.from_numpy(output).to(self.device) for output in outputs.values()]

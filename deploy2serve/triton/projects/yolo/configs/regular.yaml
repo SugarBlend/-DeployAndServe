@@ -7,5 +7,5 @@ triton:
   port: 8001
 protocol: grpc
 server:
-  module: deploy2serve.triton.overrides.yolo.server
+  module: deploy2serve.triton.projects.yolo.server
   cls: RegularYoloTriton

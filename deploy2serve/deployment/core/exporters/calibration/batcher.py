@@ -6,7 +6,7 @@ from mmengine.config import Config
 from importlib import import_module
 from pathlib import Path
 from roboflow import Roboflow
-from math import ceil
+from math import floor
 import torch
 from torch.utils.data import DataLoader
 from typing import Generator, Optional, Any, Tuple, Type
@@ -44,6 +44,7 @@ class BaseBatcher(ABC):
             self.total_frames = min(dataset.length, self.config.tensorrt.dataset.calibration_frames)
         else:
             self.total_frames = dataset.length
+        self.total_frames = floor(self.total_frames / self.batch_size) + 1
 
     def check_dataset_file(self, dataset_name: str) -> ChunkedDataset:
         def regenerate_dataset() -> None:
@@ -63,7 +64,7 @@ class BaseBatcher(ABC):
                 regenerate_dataset()
         else:
             regenerate_dataset()
-            dataset.from_file()
+        dataset.from_file()
         return dataset
 
     def _check_calibration_dataset(self) -> None:
@@ -124,7 +125,7 @@ class BaseBatcher(ABC):
 
     def get_batch(self) -> Generator[torch.Tensor, Any, None]:
         for idx, batch in enumerate(self.dataloader):
-            if self.config.tensorrt.dataset.calibration_frames and idx > ceil(self.total_frames / self.batch_size):
+            if self.config.tensorrt.dataset.calibration_frames and idx > self.total_frames:
                 return None
             if idx in self.config.tensorrt.dataset.exclude_frames:
                 continue

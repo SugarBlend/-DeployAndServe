@@ -5,33 +5,43 @@ import numpy as np
 import onnxruntime as ort
 import torch
 
-from deploy2serve.deployment.core.executors.base import BaseExecutor, ExportConfig, ExecutorFactory
+from deploy2serve.deployment.core.executors.base import BaseExecutor, ExecutorFactory
 from deploy2serve.deployment.models.common import Backend
 
 
 @ExecutorFactory.register(Backend.ONNX)
 class ORTExecutor(BaseExecutor):
-    def __init__(self, config: ExportConfig) -> None:
-        super(ORTExecutor, self).__init__(config)
+    def __init__(self, checkpoints_path: str, device: str) -> None:
+        self.checkpoints_path: str = checkpoints_path
+        self.device: torch.device = torch.device(device)
+
         ort.preload_dlls()
         sess_options = ort.SessionOptions()
-        sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-        sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
-        provider_options = {
-            "device_id": torch.device(self.config.device).index,
-            "arena_extend_strategy": "kSameAsRequested",
-            "cudnn_conv_algo_search": "HEURISTIC",
-            "do_copy_in_default_stream": True,
-            "enable_cuda_graph": False,
-            "enable_skip_layer_norm_strict_mode": True,
-            "use_tf32": True,
-        }
+        provider_options = {}
 
-        if not Path(self.config.onnx.output_file).is_absolute():
-            self.config.onnx.output_file = str(Path.cwd().joinpath(self.config.onnx.output_file))
+        if self.device.type == "cuda":
+            sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+            sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+            provider_options = {
+                "device_id": self.device.index,
+                "arena_extend_strategy": "kSameAsRequested",
+                "cudnn_conv_algo_search": "HEURISTIC",
+                "do_copy_in_default_stream": True,
+                "enable_cuda_graph": False,
+                "enable_skip_layer_norm_strict_mode": True,
+                "use_tf32": True,
+            }
+            providers = ["CUDAExecutionProvider"]
+        elif self.device.type == "cpu":
+            providers = ["CPUExecutionProvider"]
+        else:
+            raise ValueError(f"Doesn't found realization for device backend: {self.device.type}")
+
+        if not Path(self.checkpoints_path).is_absolute():
+            self.checkpoints_path = str(Path.cwd().joinpath(self.checkpoints_path))
 
         self.session, self.input_names, self.output_names = self.load(
-            self.config.onnx.output_file, sess_options, ["CUDAExecutionProvider"], [provider_options]
+            self.checkpoints_path, sess_options, providers, [provider_options]
         )
 
     @staticmethod
@@ -64,4 +74,4 @@ class ORTExecutor(BaseExecutor):
             raise TypeError(f"Unsupported input type {type(inputs)}")
 
         outputs = self.session.run(output_names=self.output_names, input_feed=input_feed)
-        return [torch.from_numpy(output).to(self.config.device) for output in outputs]
+        return [torch.from_numpy(output).to(self.device) for output in outputs]

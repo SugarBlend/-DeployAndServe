@@ -3,7 +3,7 @@ Here is a quick rundown of how to run models that build tensorrt inside a Triton
 The general steps to run any model based on the core functionality are:
 ### 1. Custom Handler Implementation
 
-- Create a custom handler class similar to the examples provided in the [`custom`](./overrides) folder.
+- Create a custom handler class similar to the examples provided in the [`custom`](./projects) folder.
 - Ensure that your handler adheres to Triton's inference protocol and properly handles input/output processing for your model.
 
 ---
@@ -49,4 +49,4 @@ To launch deploy in same triton container, you must run:
 ./deploy2serve/triton/serve.ps1
 ```
 
-> A more detailed example for Yolo Ultralytics is available [here](./overrides/yolo/README.md)
+> A more detailed example for Yolo Ultralytics is available [here](./projects/yolo/README.md)

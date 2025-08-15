@@ -14,10 +14,10 @@ enable_benchmark: true
 enable_visualization: true
 
 exporter:
-  module_path: deploy2serve.deployment.overrides.yolo.export
+  module_path: deploy2serve.deployment.projects.yolo.export
   class_name: YoloExporter
 executor:
-  module_path: deploy2serve.deployment.overrides.yolo.executor
+  module_path: deploy2serve.deployment.projects.yolo.executor
   class_name: YoloExecutor
 
 tensorrt:

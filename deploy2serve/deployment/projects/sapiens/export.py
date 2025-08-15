@@ -11,13 +11,13 @@ from deploy2serve.deployment.core.exporters.backends.tensorrt_format import Tens
 from deploy2serve.deployment.core.exporters.calibration.batcher import BaseBatcher
 from deploy2serve.deployment.core.exporters.factory import Exporter
 from deploy2serve.deployment.models.export import ExportConfig
-from deploy2serve.deployment.overrides.sapiens.batcher import PoseBatcher
+from deploy2serve.deployment.projects.sapiens.batcher import PoseBatcher
 from deploy2serve.utils.logger import get_logger, get_project_root
 
 
 @ExporterFactory.register(Backend.ONNX)
 class OverrideONNX(ONNXExporter):
-    def __init__(self, config: ExportConfig, model: torch.nn.Module):
+    def __init__(self, config: ExportConfig, model: torch.nn.Module) -> None:
         super().__init__(config, model)
 
     @contextmanager
@@ -30,7 +30,7 @@ class OverrideONNX(ONNXExporter):
 
 @ExporterFactory.register(Backend.TensorRT)
 class OverrideTensorRT(TensorRTExporter):
-    def __init__(self, config: ExportConfig, model: torch.nn.Module):
+    def __init__(self, config: ExportConfig, model: torch.nn.Module) -> None:
         super().__init__(config, model)
 
     def register_batcher(self) -> Optional[Type[BaseBatcher]]:
@@ -60,9 +60,3 @@ class SapiensExporter(Exporter):
         model.to(dtype)
         model.test_cfg.flip_test = False
         self.model = model
-
-    def register_tensorrt_plugins(self, network: trt.INetworkDefinition) -> trt.INetworkDefinition: # type: ignore[attr-defined]
-        return network
-
-    def register_onnx_plugins(self) -> None:
-        pass

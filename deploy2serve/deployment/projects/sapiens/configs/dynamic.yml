@@ -1,9 +1,9 @@
 torch_weights: weights/pytorch/sapiens_0.3b_goliath_best_goliath_AP_573.pth
-model_configuration: deploy2serve/deployment/overrides/sapiens/configs/sapiens_pose/goliath/sapiens_0.3b-210e_goliath-1024x768.py
+model_configuration: deploy2serve/deployment/projects/sapiens/configs/sapiens_pose/goliath/sapiens_0.3b-210e_goliath-1024x768.py
 
 formats:
-#  - torchscript
-#  - onnx
+  - torchscript
+  - onnx
   - tensorrt
 enable_mixed_precision: true
 input_shape: [1024, 768]
@@ -13,10 +13,10 @@ enable_benchmark: false
 enable_visualization: true
 
 exporter:
-  module_path: deploy2serve.deployment.overrides.sapiens.export
+  module_path: deploy2serve.deployment.projects.sapiens.export
   class_name: SapiensExporter
 executor:
-  module_path: deploy2serve.deployment.overrides.sapiens.executor
+  module_path: deploy2serve.deployment.projects.sapiens.executor
   class_name: SapiensExecutor
 
 tensorrt:

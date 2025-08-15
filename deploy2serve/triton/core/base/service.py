@@ -120,7 +120,7 @@ def parse_options() -> Namespace:
 
     parser.add_argument(
         "--service_config",
-        default=f"{get_project_root()}/deploy2serve/triton/overrides/yolo/configs/ensemble.yaml",
+        default=f"{get_project_root()}/deploy2serve/triton/projects/yolo/configs/ensemble.yaml",
         help="Path to service configuration.",
     )
     return parser.parse_args()

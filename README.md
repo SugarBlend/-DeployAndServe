@@ -28,7 +28,7 @@ To launch:
 
 For successful visualization, follow the provided [recommendation](./resources/.gitkeep).  
 Files mounted inside the container are linked to the project’s [weights folder](./weights), which is used by default to store models.  
-A configuration file [template](./deploy2serve/deployment/deploy_template.json) is available, along with a complete [example](./deploy2serve/deployment/overrides/yolo).
+A configuration file [template](./deploy2serve/deployment/deploy_template.json) is available, along with a complete [example](./deploy2serve/deployment/projects/yolo).
 
 This repository only includes functionality for converting PyTorch models to the following formats:
 - ✅ ONNX  

@@ -20,7 +20,7 @@ torchserve --stop
 Run the deployment script using the configuration file to export the YOLO model to TorchScript format:
 
 ```powershell
-python .\deploy2serve\deployment\deploy.py --deploy_config .\deploy2serve\deployment\overrides\dynamic.yml
+python .\deploy2serve\deployment\deploy.py --deploy_config .\deploy2serve\deployment\projects\dynamic.yml
 ```
 
 ## Step 2: Convert TorchScript Model for TorchServe (.mar)
@@ -28,7 +28,7 @@ python .\deploy2serve\deployment\deploy.py --deploy_config .\deploy2serve\deploy
 Prepare the `.mar` file (model archive) needed by TorchServe by running the following PowerShell script:
 
 ```powershell
-.\deploy2serve\torchserve\overrides\yolo\serve.ps1
+.\deploy2serve\torchserve\projects\yolo\serve.ps1
 ```
 
 ## Step 3: Start Grafana & Prometheus

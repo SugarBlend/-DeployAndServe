@@ -2,20 +2,22 @@ from pathlib import Path
 from typing import List, Union
 import torch
 
-from deploy2serve.deployment.core.executors.base import BaseExecutor, ExportConfig, ExecutorFactory
+from deploy2serve.deployment.core.executors.base import BaseExecutor, ExecutorFactory
 from deploy2serve.deployment.models.common import Backend
-from deploy2serve.utils.logger import get_project_root
 
 
 @ExecutorFactory.register(Backend.TorchScript)
 class TorchScriptExecutor(BaseExecutor):
-    def __init__(self, config: ExportConfig) -> None:
-        super(TorchScriptExecutor, self).__init__(config)
-        if not Path(self.config.torchscript.output_file).is_absolute():
-            self.config.torchscript.output_file = str(Path.cwd().joinpath(self.config.torchscript.output_file))
+    def __init__(self, checkpoints_path: str, device: str, enable_mixed_precision: bool) -> None:
+        self.checkpoints_path: str = checkpoints_path
+        self.device: torch.device = torch.device(device)
+        self.enable_mixed_precision: bool = enable_mixed_precision
+
+        if not Path(self.checkpoints_path).is_absolute():
+            self.checkpoints_path = str(Path.cwd().joinpath(self.checkpoints_path))
 
         self.scripted_model = self.load(
-            self.config.torchscript.output_file, self.config.device, self.config.enable_mixed_precision
+            self.checkpoints_path, f"{self.device.type}:{self.device.index}", self.enable_mixed_precision
         )
 
     @staticmethod

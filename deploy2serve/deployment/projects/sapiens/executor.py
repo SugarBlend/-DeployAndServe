@@ -8,10 +8,10 @@ import urllib.request
 
 from deploy2serve.deployment.core.executors.factory import ExtendExecutor
 from deploy2serve.deployment.models.export import ExportConfig
-from deploy2serve.deployment.overrides.sapiens.model.postprocess import udp_decode
-from deploy2serve.deployment.overrides.sapiens.model.preprocess import PosePreprocessor
-from deploy2serve.deployment.overrides.sapiens.utils.adapters import visualizer_adapter
-from deploy2serve.deployment.overrides.sapiens.utils.palettes import (
+from deploy2serve.deployment.projects.sapiens.model.postprocess import udp_decode
+from deploy2serve.deployment.projects.sapiens.model.preprocess import PosePreprocessor
+from deploy2serve.deployment.projects.sapiens.utils.adapters import visualizer_adapter
+from deploy2serve.deployment.projects.sapiens.utils.palettes import (
     COCO_KPTS_COLORS,
     COCO_SKELETON_INFO,
     COCO_WHOLEBODY_KPTS_COLORS,
