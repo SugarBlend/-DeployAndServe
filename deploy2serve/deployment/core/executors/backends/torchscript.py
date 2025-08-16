@@ -35,6 +35,9 @@ class TorchScriptExecutor(BaseExecutor):
             scripted_model = scripted_model.half()
         return scripted_model
 
+    @torch.no_grad()
     def infer(self, image: torch.Tensor, **kwargs) -> List[torch.Tensor]:
+        if self.enable_mixed_precision:
+            image = image.half()
         outputs = self.scripted_model(image)
         return [outputs]

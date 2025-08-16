@@ -65,7 +65,7 @@ class PoseBatcher(BaseBatcher):
 
     def load_preprocess(self) -> None:
         self.meta_data = Config(_get_dataset_metainfo(self.model_config)) # type: ignore[attr-defined]
-        if hasattr(self.meta_data, "from_file"):
+        if hasattr(self.meta_data, "from_file") and isinstance(self.meta_data.from_file, (str, Path)):
             self.meta_data = Config().fromfile(f"{Path(mmpose_path).parent}/.mim/{self.meta_data.from_file}")
 
         DefaultScope.get_instance("mmpose", scope_name="mmpose")

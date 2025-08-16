@@ -42,12 +42,16 @@ class TensorRTExecutor(BaseExecutor):
         checkpoints_path: str,
         max_batch_size: int,
         device: str,
-        log_level: trt.Logger.Severity
+        log_level: Union[trt.Logger.Severity, str]
     ) -> None:
         self.checkpoints_path: str = checkpoints_path
-        self.max_batch_size: int = max_batch_size
-        self.log_level: trt.Logger.Severity = log_level
         self.device: torch.device = torch.device(device)
+        self.max_batch_size: int = max_batch_size
+
+        if isinstance(log_level, trt.Logger.Severity):
+            self.log_level: trt.Logger.Severity = log_level
+        else:
+            self.log_level: trt.Logger.Severity = getattr(trt.Logger, log_level.upper())
 
         if not Path(self.checkpoints_path).is_absolute():
             self.checkpoints_path = str(Path.cwd().joinpath(self.checkpoints_path))
@@ -63,6 +67,7 @@ class TensorRTExecutor(BaseExecutor):
             if self.bindings[node].io_mode == "input":
                 self.input_name = node
                 break
+        self.dtype = self.bindings[self.input_name].data.dtype
 
     @staticmethod
     def _make_binding(name: str, dtype: type, shape: List[int], io_mode: str, device: str) -> Binding:
@@ -109,10 +114,12 @@ class TensorRTExecutor(BaseExecutor):
         return bindings, binding_address, context
 
     def infer(self, image: torch.Tensor, asynchronous: bool = False, **kwargs) -> List[torch.Tensor]:
+        image = image.to(self.dtype)
         if check_version(trt.__version__, ">9.1.0"):
             self.context.set_input_shape(self.input_name, image.shape)
         else:
             self.context.set_binding_shape(0, image.shape)
+        batch_size = image.shape[0]
         self.binding_address[self.input_name] = int(image.contiguous().data_ptr())
 
         if asynchronous:
@@ -122,4 +129,4 @@ class TensorRTExecutor(BaseExecutor):
         else:
             self.context.execute_v2(list(self.binding_address.values()))
 
-        return [self.bindings[node].data for node in self.bindings if self.bindings[node].io_mode == "output"]
+        return [self.bindings[node].data[:batch_size] for node in self.bindings if self.bindings[node].io_mode == "output"]

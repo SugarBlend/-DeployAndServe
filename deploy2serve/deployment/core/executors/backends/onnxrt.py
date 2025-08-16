@@ -9,13 +9,31 @@ from deploy2serve.deployment.core.executors.base import BaseExecutor, ExecutorFa
 from deploy2serve.deployment.models.common import Backend
 
 
+ONNX_TYPE_TO_NUMPY = {
+    'tensor(float)': np.float32,
+    'tensor(float16)': np.float16,
+    'tensor(double)': np.float64,
+    'tensor(int8)': np.int8,
+    'tensor(int16)': np.int16,
+    'tensor(int32)': np.int32,
+    'tensor(int64)': np.int64,
+    'tensor(uint8)': np.uint8,
+    'tensor(uint16)': np.uint16,
+    'tensor(uint32)': np.uint32,
+    'tensor(uint64)': np.uint64,
+    'tensor(bool)': np.bool_,
+    'tensor(string)': np.object_,
+}
+
+
 @ExecutorFactory.register(Backend.ONNX)
 class ORTExecutor(BaseExecutor):
     def __init__(self, checkpoints_path: str, device: str) -> None:
         self.checkpoints_path: str = checkpoints_path
         self.device: torch.device = torch.device(device)
 
-        ort.preload_dlls()
+        if hasattr(ort, 'preload_dlls'):
+            ort.preload_dlls()
         sess_options = ort.SessionOptions()
         provider_options = {}
 
@@ -60,16 +78,36 @@ class ORTExecutor(BaseExecutor):
         output_names = [out.name for out in inference_session.get_outputs()]
         return inference_session, input_names, output_names
 
+    def get_input_dtypes(self) -> Dict[str, np.dtype]:
+        return {
+            input.name: ONNX_TYPE_TO_NUMPY.get(input.type)
+            for input in self.session.get_inputs()
+        }
+
     def infer(
             self,
             inputs: Union[torch.Tensor, np.ndarray, Dict[str, Union[np.ndarray, torch.Tensor]]],
             **kwargs
     ) -> List[torch.Tensor]:
+        input_dtypes = self.get_input_dtypes()
+
+        def convert_input(name, value):
+            if isinstance(value, torch.Tensor):
+                value = value.cpu().numpy()
+            expected_dtype = input_dtypes.get(name)
+            if expected_dtype is not None and value.dtype != expected_dtype:
+                value = value.astype(expected_dtype)
+            return value
+
         if isinstance(inputs, (torch.Tensor, np.ndarray)):
-            input_feed = {self.input_names[0]: inputs.cpu().numpy() if isinstance(inputs, torch.Tensor) else inputs}
-        elif isinstance(inputs, Dict):
-            input_feed = {name: (val.cpu().numpy() if isinstance(val, torch.Tensor) else val) for name, val in
-                          inputs.items()}
+            input_feed = {
+                self.input_names[0]: convert_input(self.input_names[0], inputs)
+            }
+        elif isinstance(inputs, dict):
+            input_feed = {
+                name: convert_input(name, val)
+                for name, val in inputs.items()
+            }
         else:
             raise TypeError(f"Unsupported input type {type(inputs)}")
 
