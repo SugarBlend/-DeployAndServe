@@ -6,7 +6,7 @@ import os
 import onnx
 import onnxslim
 import torch
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, Tuple
 
 from deploy2serve.deployment.core.exporters.base import BaseExporter, ExportConfig, ExporterFactory
 from deploy2serve.deployment.models.export import Backend
@@ -42,8 +42,7 @@ class ONNXExporter(BaseExporter):
     def benchmark(
         self,
         sess_options: Optional["ort.SessionOptions"] = None,
-        provider_options: Optional[Dict[str, Any]] = None,
-        providers: Optional[List[str]] = None
+        providers: Optional[Tuple[str, Dict[str, Any]]] = None
     ) -> None:
         import onnxruntime as ort
         from deploy2serve.deployment.core.executors.backends.onnxrt import ORTExecutor
@@ -52,12 +51,10 @@ class ONNXExporter(BaseExporter):
         if sess_options is None:
             sess_options = ort.SessionOptions()
             sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-            sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+            sess_options.execution_mode = ort.ExecutionMode.ORT_PARALLEL
 
-        if providers is None:
-            providers = ["CUDAExecutionProvider"]
-
-        if provider_options is None:
+        default_provider = ["CPUExecutionProvider"]
+        if providers is None and "cuda" in self.config.device:
             provider_options = {
                 "device_id": torch.device(self.config.device).index,
                 "arena_extend_strategy": "kSameAsRequested",
@@ -67,10 +64,12 @@ class ONNXExporter(BaseExporter):
                 "enable_skip_layer_norm_strict_mode": True,
                 "use_tf32": True,
             }
+            providers = ("CUDAExecutionProvider", provider_options)
 
-        session, input_names, output_names = ORTExecutor.load(
-            self.save_path, sess_options, providers, [provider_options]
-        )
+        if providers:
+            default_provider.insert(0, providers)
+
+        session, input_names, output_names = ORTExecutor.load(self.save_path, sess_options, default_provider)
         layer_info = next(self.model.parameters())
         placeholder = torch.ones((1, 3, *self.config.input_shape), dtype=layer_info.dtype).numpy()
 

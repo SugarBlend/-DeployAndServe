@@ -4,7 +4,7 @@ dynamic = ["version"]
 requires-python = ">=3.10"
 
 [tool.poetry]
-version = "0.1.0"
+version = "0.2.0"
 readme = ["README.md"]
 packages = [
     { include = "deploy2serve/deployment", from = "." },
@@ -14,7 +14,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-numpy = "1.23.5"
+numpy = "1.26.4"
 ultralytics = "^8.3.152"
 tensorrt = "10.10.0.31"
 onnx = "^1.18.0"
@@ -26,6 +26,7 @@ pydantic = {extras = ["all"], version = "^2.11.5"}
 onnxslim = "^0.1.56"
 fastapi = {extras = ["all"], version =  ">=0.115.12"}
 mmcv = {version = ">=2.2.0", source="mmcv_prebuilt"}
+mmengine = "0.10.7"
 opencv-python = ">=4.8.1.78"
 opencv-contrib-python = ">=4.8.1.78"
 openvino = "2025.2.0"
