@@ -1,5 +1,5 @@
 opencv-python==4.8.1.78
-numpy==1.23.5
+numpy==1.26.4
 kornia==0.8.1
 
 git+https://github.com/facebookresearch/sapiens.git#egg=sapiens-pretrain&subdirectory=pretrain

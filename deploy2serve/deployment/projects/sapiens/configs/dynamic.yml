@@ -9,7 +9,7 @@ enable_mixed_precision: true
 input_shape: [1024, 768]
 device: cuda:0
 repeats: 1000
-enable_benchmark: false
+enable_benchmark: true
 enable_visualization: true
 
 exporter:
@@ -72,7 +72,7 @@ onnx:
         0: batch
     training: EVAL
     do_constant_folding: true
-  simplify: false
+  simplify: true
   output_file: weights/onnx/model.onnx
   force_rebuild: true
 
