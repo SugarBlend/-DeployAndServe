@@ -1,7 +1,7 @@
 import os
 from copy import deepcopy
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 import torch.jit
 
 from deploy2serve.deployment.core.exporters.base import BaseExporter, ExportConfig
@@ -13,9 +13,10 @@ from deploy2serve.utils.logger import get_logger
 
 @ExporterFactory.register(Backend.TorchScript)
 class TorchScriptExporter(BaseExporter):
-    def __init__(self, config: ExportConfig, model: torch.nn.Module) -> None:
-        super(TorchScriptExporter, self).__init__(config, model)
+    def __init__(self, config: ExportConfig) -> None:
+        super(TorchScriptExporter, self).__init__(config)
 
+        self.model: Optional[torch.nn.Module] = None
         self.save_path = Path(self.config.torchscript.output_file)
         if not self.save_path.is_absolute():
             self.save_path = Path.cwd().joinpath(self.save_path)
@@ -24,28 +25,49 @@ class TorchScriptExporter(BaseExporter):
 
         self.traced_model: Optional[torch.jit.ScriptModule] = None
 
+    def load_checkpoints(self, *args, **kwargs) -> Any:
+        raise NotImplementedError("Need to provide realization in child class.")
+
     @torch.no_grad()
     def benchmark(self, warmup_iterations: int = 50) -> None:
         self.logger.info(f"Start benchmark of model: {self.save_path}")
 
-        layer_info = next(self.model.parameters())
-        placeholder = torch.ones((1, 3, *self.config.input_shape), dtype=layer_info.dtype, device=layer_info.device)
+        placeholders = (
+            torch.zeros(self.config.input_nodes[node]["shape"],
+                        dtype=getattr(torch, self.config.input_nodes[node]["precision"]),
+                        device=self.config.device)
+            for node in self.config.input_nodes
+        )
+        placeholders = tuple(placeholders)
 
-        self.logger.info(f"Benchmark on tensor with shapes: {tuple(placeholder.shape)}")
+        self.logger.info(f"Benchmark on tensor with shapes:")
+        for idx, node in enumerate(self.config.input_nodes):
+            self.logger.info(f"Node '{node}': {tuple(self.config.input_nodes[node]['shape'])}")
+
+        self.logger.info(f"Benchmark TorchScript model:")
         with timer(self.logger, self.config.repeats, warmup_iterations=50) as t:
-            t(lambda: self.traced_model(placeholder))
+            t(lambda: self.traced_model(*placeholders))
 
     def export(self) -> None:
         if os.path.exists(self.save_path) and not self.config.torchscript.force_rebuild:
             return
 
         self.logger.info("Try convert PyTorch model to TorchScript format")
-        model = deepcopy(self.model)
-        layer_info = next(model.parameters())
-        placeholder = torch.ones((1, 3, *self.config.input_shape), dtype=layer_info.dtype, device=layer_info.device)
+        if self.model is None:
+            self.model: torch.nn.Module = self.load_checkpoints(
+                config_path=self.config.config_path, weights_path=self.config.weights_path
+            )
+
+        placeholders = (
+            torch.zeros(self.config.input_nodes[node]["shape"],
+                        dtype=getattr(torch, self.config.input_nodes[node]["precision"]), device=self.config.device)
+            for node in self.config.input_nodes
+        )
+        placeholders = tuple(placeholders)
+
         for _ in range(2):
-            model(placeholder)
-        self.traced_model = torch.jit.trace(model, placeholder, strict=False)
+            self.model(*placeholders)
+        self.traced_model = torch.jit.trace(self.model, placeholders, strict=False)
         if self.config.torchscript.optimize:
             try:
                 self.logger.info("Try optimize traced model")

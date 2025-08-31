@@ -17,14 +17,21 @@ from deploy2serve.utils.logger import get_logger
 
 @ExporterFactory.register(Backend.ONNX)
 class ONNXExporter(BaseExporter):
-    def __init__(self, config: ExportConfig, model: torch.nn.Module) -> None:
-        super(ONNXExporter, self).__init__(config, model)
+    def __init__(
+            self,
+            config: ExportConfig
+    ) -> None:
+        super(ONNXExporter, self).__init__(config)
 
+        self.model: Optional[torch.nn.Module] = None
         self.save_path = Path(self.config.onnx.output_file)
         if not self.save_path.is_absolute():
             self.save_path = Path.cwd().joinpath(self.save_path)
         self.save_path.parent.mkdir(exist_ok=True, parents=True)
         self.logger = get_logger(self.__class__.__name__)
+
+    def load_checkpoints(self, *args, **kwargs) -> Any:
+        raise NotImplementedError("Need to provide realization in child class.")
 
     @abstractmethod
     def register_onnx_plugins(self) -> Any:
@@ -41,9 +48,9 @@ class ONNXExporter(BaseExporter):
 
     @torch.no_grad()
     def benchmark(
-        self,
-        sess_options: Optional["ort.SessionOptions"] = None,
-        providers: Optional[Tuple[str, Dict[str, Any]]] = None
+            self,
+            sess_options: Optional["ort.SessionOptions"] = None,
+            providers: Optional[Tuple[str, Dict[str, Any]]] = None
     ) -> None:
         import onnxruntime as ort
         from deploy2serve.deployment.core.executors.backends.onnxrt import ORTExecutor
@@ -56,12 +63,14 @@ class ONNXExporter(BaseExporter):
 
         default_provider = ["CPUExecutionProvider"]
         if providers is None and "cuda" in self.config.device:
+            if hasattr(ort, "preload_dlls"):
+                ort.preload_dlls()
+
             provider_options = {
                 "device_id": torch.device(self.config.device).index,
                 "arena_extend_strategy": "kSameAsRequested",
                 "cudnn_conv_algo_search": "HEURISTIC",
                 "do_copy_in_default_stream": True,
-                "enable_cuda_graph": True,
                 "enable_skip_layer_norm_strict_mode": True,
                 "use_tf32": True,
             }
@@ -71,15 +80,32 @@ class ONNXExporter(BaseExporter):
             default_provider.insert(0, providers)
 
         session, input_names, output_names = ORTExecutor.load(self.save_path, sess_options, default_provider)
-        layer_info = next(self.model.parameters())
-        placeholder = torch.ones((1, 3, *self.config.input_shape), dtype=layer_info.dtype)
 
-        self.logger.info(f"Benchmark on tensor with shapes: {tuple(placeholder.shape)}")
+        placeholders = (
+            torch.zeros(self.config.input_nodes[node]["shape"],
+                        dtype=getattr(torch, self.config.input_nodes[node]["precision"]))
+            for node in self.config.input_nodes
+        )
+        placeholders = tuple(placeholders)
+
+        self.logger.info(f"Benchmark on tensor with shapes:")
+        for idx, item in enumerate(placeholders):
+            self.logger.info(f"Node '{input_names[idx]}': {tuple(item.shape)}")
+
+        input_feed = {name: placeholders[idx].numpy() for idx, name in enumerate(input_names)}
+        self.logger.info(f"Benchmark ONNX model:")
         with timer(self.logger, self.config.repeats, warmup_iterations=50, cuda_profiling=False) as t:
-            t(lambda: session.run(output_names, {input_names[0]: placeholder.numpy()}))
+            t(lambda: session.run(output_names, input_feed))
+        onnx_output = session.run(output_names, input_feed)
 
-        original_output = self.model(placeholder.to(self.config.device))
-        onnx_output = session.run(output_names, {input_names[0]: placeholder.numpy()})
+        if self.model is None:
+            self.model: torch.nn.Module = self.load_checkpoints(
+                config_path=self.config.config_path, weights_path=self.config.weights_path
+            )
+        self.logger.info(f"Benchmark Vanilla PyTorch model:")
+        with timer(self.logger, self.config.repeats, warmup_iterations=50, cuda_profiling=False) as t:
+            t(lambda: self.model(*(item.to(device=self.config.device) for item in placeholders)))
+        original_output = self.model(*(item.to(device=self.config.device) for item in placeholders))
 
         if isinstance(original_output, torch.Tensor):
             original_output = [original_output.detach().cpu().numpy()]
@@ -100,14 +126,23 @@ class ONNXExporter(BaseExporter):
             self.logger.info(f"ONNX model already exists at {self.save_path}. Skipping export.")
             return
 
+        if self.model is None:
+            self.model: torch.nn.Module = self.load_checkpoints(
+                config_path=self.config.config_path, weights_path=self.config.weights_path
+            )
+
         self.logger.info("Try convert PyTorch model to ONNX format")
-        model = deepcopy(self.model)
-        layer_info = next(model.parameters())
-        placeholder = torch.zeros((1, 3, *self.config.input_shape), dtype=layer_info.dtype, device=layer_info.device)
+        placeholders = (
+            torch.zeros(self.config.input_nodes[node]["shape"],
+                        dtype=getattr(torch, self.config.input_nodes[node]["precision"]), device=self.config.device)
+            for node in self.config.input_nodes
+        )
+        placeholders = tuple(placeholders)
+
         options = self.config.onnx.specific.model_dump()
         try:
             with self.patch_ops():
-                torch.onnx.export(model, (placeholder,), str(self.save_path), **options)
+                torch.onnx.export(self.model, placeholders, str(self.save_path), **options)
             self.register_onnx_plugins()
             onnx.checker.check_model(self.save_path, full_check=True)
 

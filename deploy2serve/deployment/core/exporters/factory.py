@@ -21,11 +21,12 @@ class Exporter(ABC):
         pass
 
     def convert(self, backend: Backend) -> None:
-        if self.model is None:
-            raise Exception(f"Before launch '{self.convert.__name__}' function, you need to define realization "
-                            f"of '{self.load_checkpoints.__name__}'.")
-        exporter = self.export_factory.create(backend)(self.config, self.model)
+        exporter = self.export_factory.create(backend)(self.config)
+        exporter.load_checkpoints = self.load_checkpoints
         exporter.export()
 
         if self.config.enable_benchmark:
             exporter.benchmark()
+
+        exporter.__dict__.pop("model", None)
+        torch.cuda.empty_cache()

@@ -1,5 +1,5 @@
 import json
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Union
 
 import torch.cuda
 import yaml
@@ -13,14 +13,15 @@ from deploy2serve.deployment.models.backends.torchscript_opts import TorchScript
 
 
 class ExportConfig(BaseModel):
-    torch_weights: str = Field(description="Path to original weights of the model which you want to convert.")
-    model_configuration: Optional[str] = Field(description="Path to additional configuration file for difficult cases of model initialization.")
+    weights_path: Optional[str] = Field(description="Path to original weights of the model which you want to convert.")
+    config_path: Optional[str] = Field(description="Path to additional configuration file for difficult cases of model initialization.")
 
     formats: List[Backend] = Field(default=["onnx", "tensorrt"], description="Steps for deployment pipeline.")
     enable_mixed_precision: bool = Field(
         default=True, description="Enable convert Pytorch model to fp16 precision " "before launch export steps."
     )
-    input_shape: Tuple[int, int] = Field(description="Shapes for optimization and transfer.")
+    input_nodes: Dict[str, Dict[str, Union[Tuple[int, ...], str]]] = Field(description="Shapes for optimization and transfer.")
+    output_nodes: Dict[str, Dict[str, Union[Tuple[int, ...], str]]] = Field(description="Shapes for optimization and transfer.")
     device: str = Field(default="cuda:0", description="Device backend.")
     repeats: int = Field(default=1000, description="Number for repeat iterations for inference estimation.")
     enable_benchmark: bool = Field(default=True, description="Launch benchmarks for every export format.")
