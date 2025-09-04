@@ -49,9 +49,13 @@ class PoseBatcher(BaseBatcher):
         self.load_preprocess()
         super().__init__(config, dataset_name, shape)
 
-    def transformation(self, image_path: str, bboxes: list[np.ndarray], *args, **kwargs) -> torch.Tensor:  # noqa: ANN002, ANN003, ARG002
+    def transformation(self, image_path: str, bboxes: list[np.ndarray], *args, **kwargs) -> Dict[str, torch.Tensor]:  # noqa: ANN002, ANN003, ARG002
+        if len(self.config.input_nodes) != 1:
+            raise Exception("The 'sapiens' pose estimation model should have one input node, but more are "
+                            "passed in the configuration.")
+
         preprocessed: list[torch.Tensor] = []
-        data = {"img": cv2.imread(str(image_path))}
+        data = {"img": cv2.imread(image_path.as_posix())}
         for bbox in bboxes:
             data["bbox_score"] = np.array([1.0])
             data["bbox"] = np.array(bbox).reshape(1, -1)
@@ -61,7 +65,11 @@ class PoseBatcher(BaseBatcher):
             pose_data_sample["data_samples"] = [pose_data_sample["data_samples"]]
             batch_data = self.data_preprocessor(pose_data_sample, training=False)
             preprocessed.append(batch_data["inputs"])
-        return torch.concat(preprocessed, dim=0)
+
+        return {
+            node: torch.concat(preprocessed, dim=0)
+            for node in self.config.input_nodes
+        }
 
     def load_preprocess(self) -> None:
         self.meta_data = Config(_get_dataset_metainfo(self.model_config)) # type: ignore[attr-defined]

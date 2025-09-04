@@ -9,7 +9,7 @@ from roboflow import Roboflow
 from math import floor
 import torch
 from torch.utils.data import DataLoader
-from typing import Generator, Optional, Any, Tuple, Type
+from typing import Generator, Optional, Any, Tuple, Type, List
 from urllib.parse import urlparse, unquote
 
 from deploy2serve.deployment.core.exporters.calibration.cache.lru import LRUChunkCache
@@ -18,6 +18,7 @@ from deploy2serve.deployment.core.exporters.calibration.loader import ChunkedDat
 from deploy2serve.deployment.models.export import ExportConfig
 from deploy2serve.deployment.models.dataset import RoboflowDataset, StandardDataset
 from deploy2serve.deployment.utils.uncompressor import Uncompress
+from deploy2serve.utils.logger import get_logger
 
 
 class BaseBatcher(ABC):
@@ -26,12 +27,14 @@ class BaseBatcher(ABC):
         self.shape: Tuple[int, int] = shape
 
         self.dtype: Optional[torch.dtype] = None
-
+        self.logger = get_logger(self.__class__.__name__)
         self.root = Path(self.config.tensorrt.output_file).parents[2]
         if not self.root.is_absolute():
             self.root = Path.cwd().joinpath(self.root)
 
-        self.batch_size = max([item.get("max")[0] for item in self.config.tensorrt.specific.profile_shapes])
+        profiles = self.config.tensorrt.specific.profile_shapes
+        batch_size = set(profiles[node][0]["max"][0] for node in profiles)
+        self.batch_size = 1 if len(batch_size) > 1 else batch_size.pop()
 
         self.dataset_folder = self.root.joinpath(f"calibration_dataset/{self.config.tensorrt.dataset.description.name}")
         dataset = self.check_dataset_file(dataset_name)
@@ -41,9 +44,9 @@ class BaseBatcher(ABC):
         )
 
         if self.config.tensorrt.dataset.calibration_frames:
-            self.total_frames = min(dataset.length, self.config.tensorrt.dataset.calibration_frames)
+            self.total_frames = min(max(dataset.num_samples.values()), self.config.tensorrt.dataset.calibration_frames)
         else:
-            self.total_frames = dataset.length
+            self.total_frames = max(dataset.num_samples.values())
         self.total_frames = floor(self.total_frames / self.batch_size) + 1
 
     def check_dataset_file(self, dataset_name: str) -> ChunkedDataset:
@@ -56,15 +59,30 @@ class BaseBatcher(ABC):
 
         storage_info = self.config.tensorrt.dataset.data_storage
         cls: Type[ChunkedDataset] = getattr(import_module(storage_info.module_path), storage_info.class_name)
-        dataset: Type[ChunkedDataset] = cls(self.dataset_folder, dataset_name)
+        dataset: ChunkedDataset = cls(self.dataset_folder, dataset_name)
 
+        needs_regeneration = False
         if dataset.filename.exists():
             dataset.from_file()
-            if not dataset.length or dataset.data_shape != self.config.input_shape:
-                regenerate_dataset()
+            for node in self.config.input_nodes:
+                shape = dataset.data_shape.get(node)
+                if not dataset.num_samples.get(node) or shape is None:
+                    self.logger.warning(f"Missing data for input node '{node}' — regenerating dataset.")
+                    needs_regeneration = True
+                    break
+
+                node_shape = self.config.input_nodes[node]["shape"]
+                if shape[1:] != shape[1:]:
+                    self.logger.warning(f"Shape mismatch for node '{node}': expected {node_shape[1:]}, got {shape[1:]}.")
+                    needs_regeneration = True
+                    break
         else:
+            needs_regeneration = True
+
+        if needs_regeneration:
             regenerate_dataset()
-        dataset.from_file()
+            dataset.from_file()
+
         return dataset
 
     def _check_calibration_dataset(self) -> None:
@@ -95,7 +113,7 @@ class BaseBatcher(ABC):
                 api = Roboflow(api_key=dataset.api_key)
                 project = api.workspace(dataset.workspace).project(dataset.project_id)
                 project = project.version(dataset.version_number)
-                project.download(dataset.model_format, str(self.dataset_folder))
+                project.download(dataset.model_format, self.dataset_folder.as_posix())
             elif isinstance(dataset, StandardDataset):
                 archiver = Uncompress()
 
@@ -110,7 +128,7 @@ class BaseBatcher(ABC):
                         output_file = self.dataset_folder.joinpath(Path(source).name)
                         output_file.parent.mkdir(parents=True, exist_ok=True)
                         if not output_file.exists():
-                            download(url=source, quiet=False, fuzzy=True, output=str(output_file))
+                            download(url=source, quiet=False, fuzzy=True, output=output_file.as_posix())
                     root_folder: str = archiver.uncompress(output_file, output_file.parent)
                     os.rename(output_file.parent.joinpath(root_folder), output_file.parent.joinpath(folder))
                     output_file.unlink()
@@ -123,10 +141,10 @@ class BaseBatcher(ABC):
     def transformation(self, *args, **kwargs) -> Any:
         pass
 
-    def get_batch(self) -> Generator[torch.Tensor, Any, None]:
-        for idx, batch in enumerate(self.dataloader):
+    def get_batch(self) -> Generator[List[torch.Tensor], Any, None]:
+        for idx, items in enumerate(self.dataloader):
             if self.config.tensorrt.dataset.calibration_frames and idx > self.total_frames:
-                return None
+                break
             if idx in self.config.tensorrt.dataset.exclude_frames:
                 continue
-            yield batch.to(self.config.device).to(self.dtype)
+            yield [item.to(device=self.config.device, dtype=self.dtype) for item in items]

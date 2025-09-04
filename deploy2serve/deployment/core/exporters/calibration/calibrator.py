@@ -1,7 +1,5 @@
-import os
 from pathlib import Path
-from math import floor
-from typing import Generator, List, Optional, Type
+from typing import Generator, List, Optional
 import tensorrt as trt
 import torch
 from tqdm import tqdm
@@ -23,7 +21,7 @@ class EngineCalibrator(trt.IInt8Calibrator):
         self.algorithm = self.config.specific.algorithm
 
         self.progress_bar: Optional[tqdm] = None
-        self.image_batcher: Optional[Type[BaseBatcher]] = None
+        self.image_batcher: Optional[BaseBatcher] = None
         self.batch_tensor: Optional[torch.Tensor] = None
         self.batch_generator: Optional[Generator[torch.Tensor]] = None
 
@@ -31,7 +29,7 @@ class EngineCalibrator(trt.IInt8Calibrator):
         self.cache_path = Path(cache_path)
         self.cache_path.parent.mkdir(parents=True, exist_ok=True)
 
-    def set_image_batcher(self, image_batcher: Type[BaseBatcher]) -> None:
+    def set_image_batcher(self, image_batcher: BaseBatcher) -> None:
         self.image_batcher = image_batcher
         self.batch_generator = self.image_batcher.get_batch()
 
@@ -49,10 +47,10 @@ class EngineCalibrator(trt.IInt8Calibrator):
                                      **get_progress_options())
 
         try:
-            batch = next(self.batch_generator)
+            items = next(self.batch_generator)
             if self.progress_bar:
                 self.progress_bar.update()
-            return [int(batch.contiguous().data_ptr())]
+            return [int(item.contiguous().data_ptr()) for item in items]
         except StopIteration:
             if self.progress_bar:
                 self.progress_bar.close()
@@ -63,13 +61,13 @@ class EngineCalibrator(trt.IInt8Calibrator):
         return self.algorithm
 
     def read_calibration_cache(self) -> Optional[bytes]:
-        if os.path.exists(self.cache_path) and self.config.enable_calibration_cache:
+        if self.cache_path.exists() and self.config.enable_calibration_cache:
             self.logger.info(f"Using calibration cache file: {self.cache_path}")
-            with open(self.cache_path, "rb") as file:
+            with self.cache_path.open("rb") as file:
                 return file.read()
         return None
 
     def write_calibration_cache(self, cache: memoryview) -> None:
         self.logger.info(f"Writing calibration cache data to: {self.cache_path}")
-        with open(self.cache_path, "wb") as file:
+        with self.cache_path.open("wb") as file:
             file.write(cache)

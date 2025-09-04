@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional, Union, Any, Generator, Type
+from typing import Optional, Union, Any, Generator
 
 import numpy as np
 import tensorrt as trt
@@ -45,7 +45,7 @@ class OverrideTensorRT(TensorRTExporter):
     def __init__(self, config: ExportConfig):
         super().__init__(config)
 
-    def register_batcher(self) -> Optional[Type[BaseBatcher]]:
+    def register_batcher(self) -> Optional[BaseBatcher]:
         input_node = list(self.config.input_nodes)[0]
         batch, c, h, w = self.config.input_nodes[input_node]["shape"]
         return DetectionBatcher(self.config, "yolo", (h, w))

@@ -30,7 +30,11 @@ class SapiensExecutor(ExtendExecutor):
         self.centers: Optional[torch.Tensor] = None
 
         self.dtype = torch.float16 if self.config.enable_mixed_precision else torch.float32
-        shape: Tuple[int, int] = self.config.input_shape[::-1] # type: ignore[attr-defined]
+
+        node = list(self.config.input_nodes)[0]
+        bs, c, h, w = self.config.input_nodes[node]["shape"]
+        self.input_shape = (h, w)
+        shape: Tuple[int, int] = (w, h) # type: ignore[attr-defined]
         self.preprocessor = PosePreprocessor(
             shape, torch.tensor([123.675, 116.28, 103.53]), torch.tensor([58.395, 57.12, 57.375]),
         )
@@ -42,8 +46,8 @@ class SapiensExecutor(ExtendExecutor):
     def postprocess(self, heatmaps: torch.Tensor) -> Tuple[np.ndarray, np.ndarray]:
         joints, keypoint_scores = udp_decode(
             heatmaps[0].float().cpu().numpy(), # type: ignore[attr-defined]
-            self.config.input_shape,
-            np.array(self.config.input_shape) / 4,
+            self.input_shape,
+            np.array(self.input_shape) / 4,
             )
         joints = ((joints / self.preprocessor.input_shape) * self.scales[0] + self.centers[0] - 0.5 * self.scales[0])
         return joints, keypoint_scores
