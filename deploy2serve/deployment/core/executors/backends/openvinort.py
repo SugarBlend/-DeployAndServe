@@ -30,7 +30,7 @@ class OpenVINORTExecutor(BaseExecutor):
 
         try:
             from openvino import Core
-        except ImportError:
+        except (ImportError, ):
             raise ImportError("Please install OpenVINO to use 'OpenVINORTExecutor'.")
 
         core = Core()

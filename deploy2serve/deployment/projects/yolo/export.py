@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional, Union, Any, Generator, Type
+from typing import Optional, Union, Any, Generator
 
 import numpy as np
 import tensorrt as trt
@@ -19,8 +19,8 @@ from deploy2serve.deployment.projects.yolo.batcher import DetectionBatcher
 
 @ExporterFactory.register(Backend.ONNX)
 class OverrideONNX(ONNXExporter):
-    def __init__(self, config: ExportConfig, model: torch.nn.Module):
-        super().__init__(config, model)
+    def __init__(self, config: ExportConfig):
+        super().__init__(config)
 
     @contextmanager
     def patch_ops(self) -> Generator[None, Any, None]:
@@ -42,11 +42,13 @@ class OverrideONNX(ONNXExporter):
 
 @ExporterFactory.register(Backend.TensorRT)
 class OverrideTensorRT(TensorRTExporter):
-    def __init__(self, config: ExportConfig, model: torch.nn.Module):
-        super().__init__(config, model)
+    def __init__(self, config: ExportConfig):
+        super().__init__(config)
 
-    def register_batcher(self) -> Optional[Type[BaseBatcher]]:
-        return DetectionBatcher(self.config, "yolo", self.config.input_shape)
+    def register_batcher(self) -> Optional[BaseBatcher]:
+        input_node = list(self.config.input_nodes)[0]
+        batch, c, h, w = self.config.input_nodes[input_node]["shape"]
+        return DetectionBatcher(self.config, "yolo", (h, w))
 
     def register_tensorrt_plugins(self, network: trt.INetworkDefinition) -> trt.INetworkDefinition:
         available_plugins = {
@@ -54,11 +56,25 @@ class OverrideTensorRT(TensorRTExporter):
             "batched_nms": add_batched_nms_plugin,
         }
 
+        model: torch.nn.Module = self.load_checkpoints(
+            config_path=self.config.config_path, weights_path=self.config.weights_path
+        )
+
         for search_plugin, impl in available_plugins.items():
             plugin = next((plugin for plugin in self.config.tensorrt.plugins if plugin.name == search_plugin), None)
             if plugin:
-                plugin.options.update({"nc": self.model.nc})
+                plugin.options.update({"nc": model.nc})
                 network = impl(network, plugin)
+
+                self.config.output_nodes.clear()
+                for idx in range(network.num_outputs):
+                    node = network.get_output(idx)
+                    shape = node.shape
+                    shape[0] = max(shape[0], 1)
+                    self.config.output_nodes[node.name] = {
+                        "shape": shape,
+                        "precision": getattr(np, node.dtype.name.lower()).__name__
+                    }
         return network
 
 
@@ -232,7 +248,11 @@ class YoloExporter(Exporter):
     def __init__(self, config: ExportConfig) -> None:
         super(YoloExporter, self).__init__(config)
 
-    def load_checkpoints(self, weights_path: Union[str, Path], model_configuration: Optional[str] = None) -> None:
+    def load_checkpoints(
+            self,
+            weights_path: Union[str, Path],
+            config_path: Optional[str] = None
+    ) -> torch.nn.Module:
         self.model = YOLO(weights_path)
         if len(self.config.tensorrt.plugins) and self.config.onnx.specific.dynamic_axes:
             cls = WrappedModel
@@ -249,3 +269,5 @@ class YoloExporter(Exporter):
             self.model.half()
         else:
             self.model.float()
+
+        return self.model

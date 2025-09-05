@@ -7,9 +7,8 @@ from deploy2serve.deployment.models.export import ExportConfig, Backend
 
 
 class BaseExporter(ABC):
-    def __init__(self, config: ExportConfig, model: torch.nn.Module) -> None:
+    def __init__(self, config: ExportConfig) -> None:
         self.config: ExportConfig = config
-        self.model: torch.nn.Module = model
 
         warnings.filterwarnings("ignore", category=torch.jit.TracerWarning)
         warnings.filterwarnings("ignore", category=UserWarning)

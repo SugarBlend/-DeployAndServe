@@ -21,15 +21,14 @@ def converter(args: Namespace) -> None:
 
     exporter = get_object(config.exporter.module_path, config.exporter.class_name)(config)
 
-    if not Path(config.torch_weights).is_absolute():
-        config.torch_weights = str(Path.cwd().joinpath(config.torch_weights))
-
-    exporter.load_checkpoints(config.torch_weights, config.model_configuration)
-    executor = get_object(config.executor.module_path, config.executor.class_name)(config)
+    if not Path(config.weights_path).is_absolute():
+        config.weights_path = str(Path.cwd().joinpath(config.weights_path))
 
     for backend in config.formats:
         exporter.convert(backend)
         if config.enable_visualization:
+            executor_cls = get_object(config.executor.module_path, config.executor.class_name)
+            executor = executor_cls(exporter.config)
             executor.visualization(backend)
 
 

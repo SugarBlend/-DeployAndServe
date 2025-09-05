@@ -18,8 +18,8 @@ class SpecificOptions(BaseModel):
     precision: Optional[Union[Precision, trt.BuilderFlag]] = Field(
         default=Precision.FP16, description="Precision of layers weights."
     )
-    profile_shapes: List[Dict[str, Tuple[int, int, int, int]]] = Field(
-        description="Inputs shapes for network for optimization."
+    profile_shapes: Optional[Dict[str, List[Dict[str, Tuple[int, ...]]]]] = Field(
+        default=None, description="Inputs shapes for network for optimization."
     )
     workspace: int = Field(default=int(1 << 30) // 4, description="Allowed memory workspace for using in build step.")
     flags: Optional[List[Union[str, trt.BuilderFlag]]] = Field(

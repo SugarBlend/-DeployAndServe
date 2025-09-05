@@ -17,7 +17,10 @@ from deploy2serve.deployment.models.common import Plugin
 class YoloExecutor(ExtendExecutor):
     def __init__(self, config: ExportConfig) -> None:
         super(YoloExecutor, self).__init__(config)
-        self.letterbox = LetterBox(new_shape=self.config.input_shape)
+        input_node = list(self.config.input_nodes)[0]
+        batch, c, h, w = self.config.input_nodes[input_node]["shape"]
+        self.input_shape = (h, w)
+        self.letterbox = LetterBox(new_shape=self.input_shape)
         self.class_names = [
             "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light",
             "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow",
@@ -66,7 +69,7 @@ class YoloExecutor(ExtendExecutor):
             for idx in range(output.shape[0]):
                 confidences = output[idx, :, 4:5].reshape(-1).cpu().numpy()
                 detections = output[idx, :, :4][confidences > 0.1]
-                boxes.append(scale_boxes(self.config.input_shape, detections, orig_shape).cpu().numpy())
+                boxes.append(scale_boxes(self.input_shape, detections, orig_shape).cpu().numpy())
                 classes.append(output[idx, :, 5:][confidences > 0.1].to(torch.int32).reshape(-1).cpu().numpy())
                 scores.append(confidences[confidences > 0.1].reshape(-1, 1))
         else:
@@ -75,7 +78,7 @@ class YoloExecutor(ExtendExecutor):
             else:
                 for idx in range(len(output)):
                     detections = non_max_suppression(output[idx])[0]
-                    boxes.append(scale_boxes(self.config.input_shape, detections[:, :4], orig_shape).cpu().numpy())
+                    boxes.append(scale_boxes(self.input_shape, detections[:, :4], orig_shape).cpu().numpy())
                     scores.append(detections[:, 4:5].reshape(-1, 1).cpu().numpy())
                     classes.append(detections[:, 5:].reshape(-1).to(torch.int).cpu().numpy())
 

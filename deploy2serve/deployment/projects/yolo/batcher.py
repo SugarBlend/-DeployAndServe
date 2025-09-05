@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import torch
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 from ultralytics.data.augment import LetterBox
 
 from deploy2serve.deployment.core.exporters.calibration.batcher import BaseBatcher, ExportConfig
@@ -18,9 +18,17 @@ class DetectionBatcher(BaseBatcher):
     def load_preprocess(self) -> None:
         self.letterbox = LetterBox(new_shape=self.shape)
 
-    def transformation(self, image_path: str, *args, **kwargs) -> torch.Tensor:
+    def transformation(self, image_path: str, *args, **kwargs) -> Dict[str, torch.Tensor]:
+        if len(self.config.input_nodes) != 1:
+            raise Exception("The 'yolo' detector model should have one input node, but more are "
+                            "passed in the configuration.")
+
         image = cv2.cvtColor(cv2.imread(str(image_path)), cv2.COLOR_BGR2RGB)
         preprocessed = self.letterbox(image=image)
         preprocessed = np.transpose(preprocessed, (2, 0, 1))[None]
         preprocessed = preprocessed / 255.0
-        return torch.from_numpy(preprocessed.astype(np.float32))
+
+        return {
+            node: torch.from_numpy(preprocessed.astype(np.float32))
+            for node in self.config.input_nodes
+        }

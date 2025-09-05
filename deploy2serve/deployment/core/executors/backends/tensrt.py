@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from pathlib import Path
-from typing import List, Literal, Tuple, Union
+from typing import List, Literal, Tuple, Union, Dict
 
 import numpy as np
 import tensorrt as trt
@@ -40,13 +40,13 @@ class TensorRTExecutor(BaseExecutor):
     def __init__(
         self,
         checkpoints_path: str,
-        max_batch_size: int,
+        shapes: Dict[str, Tuple[int, ...]],
         device: str,
         log_level: Union[trt.Logger.Severity, str]
     ) -> None:
         self.checkpoints_path: str = checkpoints_path
         self.device: torch.device = torch.device(device)
-        self.max_batch_size: int = max_batch_size
+        self.shapes: Dict[str, Tuple[int, ...]] = shapes
 
         if isinstance(log_level, trt.Logger.Severity):
             self.log_level: trt.Logger.Severity = log_level
@@ -58,7 +58,7 @@ class TensorRTExecutor(BaseExecutor):
 
         self.bindings, self.binding_address, self.context = self.load(
             self.checkpoints_path,
-            self.max_batch_size,
+            self.shapes,
             f"{self.device.type}:{self.device.index}",
             self.log_level
         )
@@ -77,7 +77,7 @@ class TensorRTExecutor(BaseExecutor):
     @staticmethod
     def load(
         weights_path: Union[str, Path],
-        max_batch: int,
+        shapes: Dict[str, Tuple[int, ...]],
         device: str,
         log_level: trt.Logger.Severity = trt.Logger.ERROR
     ) -> Tuple[OrderedDict[str, Binding], OrderedDict[str, int], trt.IExecutionContext]:
@@ -95,14 +95,18 @@ class TensorRTExecutor(BaseExecutor):
             for index in range(model.num_bindings):
                 name = model.get_binding_name(index)
                 dtype = trt.nptype(model.get_binding_dtype(index))
-                shape = (max_batch, *model.get_binding_shape(index)[1:])
+                shape = shapes.get(name, None)
+                if not shape:
+                    shape = model.get_binding_shape(index)
                 io_mode = "input" if model.binding_is_input(index) else "output"
                 bindings[name] = TensorRTExecutor._make_binding(name, dtype, shape, io_mode, device)
         elif check_version(trt.__version__, ">9.1.0"):
             for index in range(model.num_io_tensors):
                 name = model.get_tensor_name(index)
                 dtype = trt.nptype(model.get_tensor_dtype(name))
-                shape = (max_batch, *model.get_tensor_shape(name)[1:])
+                shape = shapes.get(name, None)
+                if not shape:
+                    shape = model.get_tensor_shape(name)
                 io_mode = "input" if model.get_tensor_mode(name) == trt.TensorIOMode.INPUT else "output"
                 bindings[name] = TensorRTExecutor._make_binding(name, dtype, shape, io_mode, device)
         else:

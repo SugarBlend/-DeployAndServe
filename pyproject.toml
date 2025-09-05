@@ -33,6 +33,7 @@ openvino = "2025.2.0"
 colorlog = "6.9.0"
 zarr = "2.18.3"
 h5py = "3.14.0"
+hdf5plugin = "5.1.0"
 roboflow = "1.2.3"
 gdown = "5.2.0"
 pycocotools = "2.0.10"
@@ -40,7 +41,6 @@ pycocotools = "2.0.10"
 [tool.poetry.group.formatting.dependencies]
 black = ">=25.1.0"
 flake8 = ">=7.2.0"
-isort = ">=6.0.1"
 pre-commit = "^4.2.0"
 
 [tool.poetry.group.test.dependencies]
