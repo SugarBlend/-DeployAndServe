@@ -22,6 +22,11 @@ class OverrideONNX(ONNXExporter):
     def __init__(self, config: ExportConfig):
         super().__init__(config)
 
+    def register_batcher(self) -> Optional[BaseBatcher]:
+        input_node = list(self.config.input_nodes)[0]
+        batch, c, h, w = self.config.input_nodes[input_node]["shape"]
+        return DetectionBatcher(self.config, "yolo", (h, w))
+
     @contextmanager
     def patch_ops(self) -> Generator[None, Any, None]:
         if self.config.enable_mixed_precision:

@@ -79,9 +79,26 @@ onnx:
     dynamic_axes: null
     training: EVAL
     do_constant_folding: true
+  modelopt:
+    quant_mode: int8
+    calib_method: max
+    calib_buffer: 500
+    calibration_eps:
+      - cuda
+      - cpu
+      - dml
+    op_types_to_quantize:
+      - MatMul
+      - Conv
+    nodes_to_exclude:
+      - /Shape
+    qdq_for_weights: false
+    use_external_data_format: false
+    keep_intermediate_files: false
   simplify: true
   output_file: weights/yolo/onnx/model.onnx
   force_rebuild: true
+
 
 torchscript:
   optimize: false

@@ -87,7 +87,7 @@ class TensorRTExecutor(BaseExecutor):
 
         logger = trt.Logger(log_level)
         trt.init_libnvinfer_plugins(logger, namespace="")
-        with open(weights_path, "rb") as file, trt.Runtime(logger) as runtime:
+        with path.open("rb") as file, trt.Runtime(logger) as runtime:
             model = runtime.deserialize_cuda_engine(file.read())
         bindings = OrderedDict()
 

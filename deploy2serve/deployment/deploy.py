@@ -22,7 +22,7 @@ def converter(args: Namespace) -> None:
     exporter = get_object(config.exporter.module_path, config.exporter.class_name)(config)
 
     if not Path(config.weights_path).is_absolute():
-        config.weights_path = str(Path.cwd().joinpath(config.weights_path))
+        config.weights_path = Path.cwd().joinpath(config.weights_path).as_posix()
 
     for backend in config.formats:
         exporter.convert(backend)

@@ -2,7 +2,7 @@ import logging
 from abc import abstractmethod
 import os
 from pathlib import Path
-from typing import Any, List, Optional, Tuple, Type
+from typing import Any, Optional, Tuple, Type
 import sys
 import torch
 import tensorrt as trt
@@ -165,25 +165,25 @@ class TensorRTExporter(BaseExporter):
         logger.log(logger.INFO, f"Total outputs: {len(outputs)}")
 
         logger.log(logger.INFO, "== Network Inputs ==")
-        for i in inputs:
-            logger.log(logger.INFO, f"[Input] {i.name}: shape={i.shape}, dtype={i.dtype}")
+        for node in inputs:
+            logger.log(logger.INFO, f"[Input] {node.name}: shape={node.shape}, dtype={node.dtype}")
 
         logger.log(logger.INFO, "== Network Outputs ==")
-        for o in outputs:
-            logger.log(logger.INFO, f"[Output] {o.name}: shape={o.shape}, dtype={o.dtype}")
+        for node in outputs:
+            logger.log(logger.INFO, f"[Output] {node.name}: shape={node.shape}, dtype={node.dtype}")
 
     def _store_files(
-            self,
-            builder: trt.Builder,
-            config: trt.IBuilderConfig,
-            network: trt.INetworkDefinition
+        self,
+        builder: trt.Builder,
+        config: trt.IBuilderConfig,
+        network: trt.INetworkDefinition
     ) -> None:
         if self.config.tensorrt.enable_timing_cache:
             cache_folder = Path(self.save_path).parent.joinpath("timing_cache")
             cache_folder.mkdir(parents=True, exist_ok=True)
             cache_file = cache_folder.joinpath(f"{self.save_path.stem}.cache")
             try:
-                with open(cache_file, "rb") as file:
+                with cache_file.open("rb") as file:
                     timing_cache = config.create_timing_cache(file.read())
             except (IOError, TypeError):
                 timing_cache = config.create_timing_cache(b"")
@@ -198,7 +198,7 @@ class TensorRTExporter(BaseExporter):
         self.logger.info(f"TensorRT engine successfully stored in: {self.save_path}")
 
     def export(self) -> None:
-        if os.path.exists(self.save_path) and not self.config.tensorrt.force_rebuild:
+        if self.save_path.exists() and not self.config.tensorrt.force_rebuild:
             return
 
         self.logger.info("Try convert ONNX model to TensorRT engine")
@@ -208,7 +208,7 @@ class TensorRTExporter(BaseExporter):
         Path(self.save_path).parent.mkdir(parents=True, exist_ok=True)
 
         if not Path(self.config.onnx.output_file).is_absolute():
-            self.config.onnx.output_file = str(Path.cwd().joinpath(self.config.onnx.output_file))
+            self.config.onnx.output_file = Path.cwd().joinpath(self.config.onnx.output_file).as_posix()
         current_folder = os.getcwd()
         # It is necessary so that TensorRT can pull up additional ONNX weight files.
         os.chdir(Path(self.config.onnx.output_file).parent)

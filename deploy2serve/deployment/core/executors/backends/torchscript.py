@@ -14,7 +14,7 @@ class TorchScriptExecutor(BaseExecutor):
         self.enable_mixed_precision: bool = enable_mixed_precision
 
         if not Path(self.checkpoints_path).is_absolute():
-            self.checkpoints_path = str(Path.cwd().joinpath(self.checkpoints_path))
+            self.checkpoints_path = Path.cwd().joinpath(self.checkpoints_path).as_posix()
 
         self.scripted_model = self.load(
             self.checkpoints_path, f"{self.device.type}:{self.device.index}", self.enable_mixed_precision

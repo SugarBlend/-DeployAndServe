@@ -1,6 +1,5 @@
 from abc import abstractmethod
 from contextlib import contextmanager
-from copy import deepcopy
 from pathlib import Path
 import numpy as np
 import os
@@ -10,6 +9,7 @@ import torch
 from typing import Any, Dict, Optional, Tuple, List
 
 from deploy2serve.deployment.core.exporters.base import BaseExporter, ExportConfig, ExporterFactory
+from deploy2serve.deployment.core.exporters.calibration.batcher import BaseBatcher
 from deploy2serve.deployment.models.export import Backend
 from deploy2serve.deployment.utils.wrappers import timer
 from deploy2serve.utils.logger import get_logger
@@ -28,6 +28,10 @@ class ONNXExporter(BaseExporter):
         if not self.save_path.is_absolute():
             self.save_path = Path.cwd().joinpath(self.save_path)
         self.save_path.parent.mkdir(exist_ok=True, parents=True)
+
+        if self.config.onnx.modelopt.quant_mode and self.config.onnx.modelopt.calib_method:
+            self.batcher: BaseBatcher = self.register_batcher()
+
         self.logger = get_logger(self.__class__.__name__)
 
     def load_checkpoints(self, *args, **kwargs) -> Any:
@@ -142,21 +146,64 @@ class ONNXExporter(BaseExporter):
         options = self.config.onnx.specific.model_dump()
         try:
             with self.patch_ops():
-                torch.onnx.export(self.model, placeholders, str(self.save_path), **options)
+                torch.onnx.export(self.model, placeholders, self.save_path.as_posix(), **options)
             self.register_onnx_plugins()
             onnx.checker.check_model(self.save_path, full_check=True)
 
             if self.config.onnx.simplify:
                 self.logger.info("Try to simplify ONNX model")
                 optimized_onnx_model = onnxslim.slim(
-                    str(self.save_path),
+                    self.save_path.as_posix(),
                     skip_optimizations=False,
                     skip_fusion_patterns=False
                 )
                 onnx.checker.check_model(optimized_onnx_model, full_check=True)
                 onnx.save_model(optimized_onnx_model, self.save_path)
                 self.logger.info("Simplification successfully done")
+
+            if self.config.onnx.modelopt.quant_mode and self.config.onnx.modelopt.calib_method:
+                self.quantize(onnx_path=self.save_path.as_posix())
         except Exception as error:
             self.logger.critical(f"Catch error while apply export: {error}")
 
         self.logger.info(f"ONNX model successfully stored in: {self.save_path}")
+
+    @abstractmethod
+    def register_batcher(self, *args, **kwargs) -> Any:
+        raise NotImplementedError(
+            "This method doesn't implemented, your should create him in custom class, based on 'ExtendExporter'."
+        )
+
+    def quantize(self, onnx_path: str) -> None:
+        from modelopt.onnx.quantization.quantize import quantize as quantize_top_level_api
+
+        calibration_data = {node: [] for node in self.config.input_nodes}
+        for i, items in enumerate(self.batcher.dataloader):
+            if i == self.config.onnx.modelopt.calib_buffer:
+                break
+            for j, item in enumerate(items):
+                calibration_data[list(self.config.input_nodes)[j]].append(item.cpu().numpy())
+
+        dtype = np.float16 if self.config.enable_mixed_precision else np.float32
+        for node in calibration_data:
+            calibration_data[node] = np.concatenate(calibration_data[node], axis=0).astype(dtype)
+
+        short_dtype = "fp16" if self.config.enable_mixed_precision else "fp32"
+
+        quantize_top_level_api(
+            onnx_path=onnx_path,
+            quantize_mode=self.config.onnx.modelopt.quant_mode,
+            calibration_method=self.config.onnx.modelopt.calib_method,
+            calibration_data=calibration_data,
+            calibration_eps=self.config.onnx.modelopt.calibration_eps,
+            use_external_data_format=self.config.onnx.modelopt.use_external_data_format,
+            output_path=onnx_path,
+            op_types_to_quantize=self.config.onnx.modelopt.op_types_to_quantize,
+            nodes_to_exclude=self.config.onnx.modelopt.nodes_to_exclude,
+            dq_only=not self.config.onnx.modelopt.qdq_for_weights,
+            verbose=True,
+            high_precision_dtype=short_dtype,
+            mha_accumulation_dtype=short_dtype,
+            enable_gemv_detection_for_trt=False,
+            enable_shared_constants_duplication=False,
+        )

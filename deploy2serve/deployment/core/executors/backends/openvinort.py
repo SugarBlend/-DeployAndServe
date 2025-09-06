@@ -18,7 +18,7 @@ class OpenVINORTExecutor(BaseExecutor):
         self.device: torch.device = torch.device(device.lower())
 
         if not Path(self.checkpoints_path).is_absolute():
-            self.checkpoints_path = str(Path.cwd().joinpath(self.checkpoints_path))
+            self.checkpoints_path = Path.cwd().joinpath(self.checkpoints_path).as_posix()
 
         self.compiled_model = self.load(self.checkpoints_path, device)
 
@@ -36,7 +36,7 @@ class OpenVINORTExecutor(BaseExecutor):
         core = Core()
         cache_dir = Path("~/.openvino_cache").expanduser()
         cache_dir.mkdir(parents=True, exist_ok=True)
-        core.set_property({"CACHE_DIR": str(cache_dir)})
+        core.set_property({"CACHE_DIR": cache_dir.as_posix()})
 
         model = core.read_model(weights_path)
         compiled_model = core.compile_model(model, device)
