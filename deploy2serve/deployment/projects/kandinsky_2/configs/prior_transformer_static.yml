@@ -1,0 +1,99 @@
+weights_path: null
+config_path: null
+
+formats:
+  - onnx
+  - tensorrt
+enable_mixed_precision: true
+input_nodes:
+  latent:
+    shape: [2, 1280]
+    precision: float16
+  timestep:
+    shape: [1,]
+    precision: int64
+  prompt_embeds:
+    shape: [2, 1280]
+    precision: float16
+  encoder_hidden_states:
+    shape: [2, 77, 1280]
+    precision: float16
+  attention_mask:
+    shape: [2, 77]
+    precision: bool
+output_nodes:
+  image_embeds:
+    shape: [2, 1280]
+    precision: float16
+device: cuda:0
+repeats: 1000
+enable_benchmark: false
+enable_visualization: false
+
+executor:
+  module_path: deploy2serve.deployment.projects.kandinsky_2.prior.executor
+  class_name: PriorExecutor
+exporter:
+  module_path: deploy2serve.deployment.projects.kandinsky_2.prior.export
+  class_name: PriorExporter
+
+tensorrt:
+  specific:
+    log_level: INFO
+    precision: int8
+    workspace: 4_294_967_296
+    flags:
+      - TF32
+      - DIRECT_IO
+      - OBEY_PRECISION_CONSTRAINTS
+      - SPARSE_WEIGHTS
+    profiling_verbosity: NONE
+    max_aux_streams: 4
+    runtime_platform: null
+    compatibility_level: null
+    tactics: null
+    algorithm: ENTROPY_CALIBRATION_2
+  dataset:
+    calibration_frames: null
+    exclude_frames: [ ]
+    labels_generator:
+      module_path: deploy2serve.deployment.projects.kandinsky_2.prompt_generator
+      class_name: PromptGenerator
+    data_storage:
+      module_path: deploy2serve.deployment.core.exporters.calibration.dataset.zarr_dataset
+      class_name: ZarrChunkedDataset
+  enable_timing_cache: true
+  enable_calibration_cache: true
+  output_file: checkpoints/kandinsky_2/prior/tensorrt/model.plan
+  force_rebuild: true
+
+onnx:
+  specific:
+    keep_initializers_as_inputs: false
+    export_params: true
+    verbose: null
+    input_names: [latent, timestep, prompt_embeds, encoder_hidden_states, attention_mask]
+    output_names: [image_embeds]
+    opset_version: 19
+    training: EVAL
+    do_constant_folding: true
+#  modelopt:
+#    quant_mode: fp8
+#    calib_method: max
+#    calib_buffer: 500
+#    calibration_eps:
+#      - cuda
+#      - cpu
+#      - dml
+#    op_types_to_quantize:
+#      - Conv
+#      - MatMul
+#    nodes_to_exclude:
+#      - /Shape
+#      - /LayerNormalization
+#    qdq_for_weights: false
+#    use_external_data_format: false
+#    keep_intermediate_files: false
+  simplify: false
+  output_file: checkpoints/kandinsky_2/prior/onnx/model.onnx
+  force_rebuild: true

@@ -62,7 +62,7 @@ class ZarrChunkedDataset(ChunkedDataset):
 
             arrays: Dict[str, zarr.Array] = {}
             for key, value in sample_tensors.items():
-                tensor_shape = value.shape[1:]
+                tensor_shape = value.shape
                 arrays[key] = group.create_dataset(
                     name=key,
                     shape=(0, *tensor_shape),
@@ -79,7 +79,7 @@ class ZarrChunkedDataset(ChunkedDataset):
                 if not tensors_buffer[key]:
                     return key, 0
 
-                batch = np.concatenate(tensors_buffer[key], axis=0)
+                batch = np.stack(tensors_buffer[key])
                 batch_size = batch.shape[0]
                 arrays[key].resize((idx + batch_size, *arrays[key].shape[1:]))
                 arrays[key][idx: idx + batch_size] = batch

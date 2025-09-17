@@ -1,0 +1,93 @@
+weights_path: null
+config_path: null
+
+formats:
+  - onnx
+  - tensorrt
+enable_mixed_precision: true
+input_nodes:
+  latent:
+    shape: [2, 4, 96, 96]
+    precision: float16
+  timestep:
+    shape: [1,]
+    precision: int64
+  image_embeds:
+    shape: [2, 1280]
+    precision: float16
+output_nodes:
+  noise:
+    shape: [2, 8, 96, 96]
+    precision: float16
+device: cuda:0
+repeats: 10
+enable_benchmark: true
+enable_visualization: false
+
+executor:
+  module_path: deploy2serve.deployment.projects.kandinsky_2.unet.executor
+  class_name: UnetExecutor
+exporter:
+  module_path: deploy2serve.deployment.projects.kandinsky_2.unet.export
+  class_name: UnetExporter
+
+tensorrt:
+  specific:
+    log_level: INFO
+    precision: int8
+    workspace: 1_073_741_824
+    flags:
+      - TF32
+      - DIRECT_IO
+      - PREFER_PRECISION_CONSTRAINTS
+      - SPARSE_WEIGHTS
+    profiling_verbosity: NONE
+    max_aux_streams: 4
+    runtime_platform: null
+    compatibility_level: null
+    tactics: null
+    algorithm: ENTROPY_CALIBRATION_2
+  dataset:
+    calibration_frames: null
+    exclude_frames: [ ]
+    labels_generator:
+      module_path: deploy2serve.deployment.projects.kandinsky_2.prompt_generator
+      class_name: PromptGenerator
+    data_storage:
+      module_path: deploy2serve.deployment.core.exporters.calibration.dataset.zarr_dataset
+      class_name: ZarrChunkedDataset
+  enable_timing_cache: true
+  enable_calibration_cache: true
+  output_file: checkpoints/kandinsky_2/unet/tensorrt/model.plan
+  force_rebuild: true
+
+onnx:
+  specific:
+    keep_initializers_as_inputs: false
+    export_params: true
+    verbose: null
+    input_names: [latent, timestep, image_embeds]
+    output_names: [noise]
+    opset_version: 19
+    training: EVAL
+    do_constant_folding: true
+#  modelopt:
+#    quant_mode: int8
+#    calib_method: max
+#    calib_buffer: 500
+#    calibration_eps:
+#      - cuda
+#      - cpu
+#      - dml
+#    op_types_to_quantize:
+#      - Conv
+#      - MatMul
+#    nodes_to_exclude:
+#      - /Shape
+#      - /LayerNormalization
+#    qdq_for_weights: false
+#    use_external_data_format: false
+#    keep_intermediate_files: false
+  simplify: false
+  output_file: checkpoints/kandinsky_2/unet/onnx/model.onnx
+  force_rebuild: true

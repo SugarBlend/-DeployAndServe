@@ -33,10 +33,15 @@ class BaseBatcher(ABC):
             self.root = Path.cwd().joinpath(self.root)
 
         profiles = self.config.tensorrt.specific.profile_shapes
-        batch_size = set(profiles[node][0]["max"][0] for node in profiles)
+        if profiles:
+            batch_size = set(profiles[node][0]["max"][0] for node in profiles)
+        else:
+            batch_size = set([self.config.input_nodes[node]["shape"][0] for node in self.config.input_nodes])
         self.batch_size = 1 if len(batch_size) > 1 else batch_size.pop()
 
-        self.dataset_folder = self.root.joinpath(f"calibration_dataset/{self.config.tensorrt.dataset.description.name}")
+        dataset_info = self.config.tensorrt.dataset.description
+        subfolder = f"/{dataset_info}" if dataset_info else ""
+        self.dataset_folder = self.root.joinpath(f"calibration_dataset", subfolder)
         dataset = self.check_dataset_file(dataset_name)
         loader = ChunkedDatasetLoader(dataset, LRUChunkCache(max_chunks=2))
         self.dataloader = DataLoader(
@@ -51,9 +56,11 @@ class BaseBatcher(ABC):
 
     def check_dataset_file(self, dataset_name: str) -> ChunkedDataset:
         def regenerate_dataset() -> None:
-            self._check_calibration_dataset()
+            if self.config.tensorrt.dataset.description is not None:
+                self._check_calibration_dataset()
             generator_info = self.config.tensorrt.dataset.labels_generator
-            generator = getattr(import_module(generator_info.module_path), generator_info.class_name)(self.dataset_folder)
+            generator = getattr(import_module(generator_info.module_path),
+                                generator_info.class_name)(self.dataset_folder)
             labels = generator.generate_labels()
             dataset.create_dataset_file(lambda args: self.transformation(*args), list(zip(*labels.values())))
 
@@ -73,7 +80,9 @@ class BaseBatcher(ABC):
 
                 node_shape = self.config.input_nodes[node]["shape"]
                 if shape[1:] != shape[1:]:
-                    self.logger.warning(f"Shape mismatch for node '{node}': expected {node_shape[1:]}, got {shape[1:]}.")
+                    self.logger.warning(
+                        f"Shape mismatch for node '{node}': expected {node_shape[1:]}, got {shape[1:]}."
+                    )
                     needs_regeneration = True
                     break
         else:

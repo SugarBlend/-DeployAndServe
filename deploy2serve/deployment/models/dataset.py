@@ -22,8 +22,9 @@ class StandardDataset(BaseModel):
 
 
 class Dataset(BaseModel):
-    description: Union[StandardDataset, RoboflowDataset] = Field(description="A structure describing the contents of "
-                                                                             "supported data sets.")
+    description: Optional[Union[StandardDataset, RoboflowDataset]] = Field(
+        default=None, description="A structure describing the contents of supported data sets."
+    )
     calibration_frames: Optional[int] = Field(default=None, description="Quantity limiting set of calibration images.")
     exclude_frames: List[int] = Field(default=[],
                                       description="A set of image serial numbers that must be excluded from the "
