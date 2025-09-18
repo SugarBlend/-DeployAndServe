@@ -148,6 +148,9 @@ class TensorRTExporter(BaseExporter):
                     pass
             config.set_flag(flag)
 
+        if self.config.tensorrt.specific.precision in [trt.BuilderFlag.FP4, trt.BuilderFlag.FP8]:
+            config.set_flag(trt.BuilderFlag.FP16)
+
         if self.config.tensorrt.specific.precision in [trt.BuilderFlag.INT4, trt.BuilderFlag.INT8]:
             config.set_flag(trt.BuilderFlag.FP16)
             config.int8_calibrator = self.calibrator

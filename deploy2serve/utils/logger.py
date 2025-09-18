@@ -27,7 +27,3 @@ def get_project_root() -> Path:
     return Path(__file__).parents[2]
 
 
-class LoggingMixin(object):
-    @classmethod
-    def get_logger(cls) -> logging.Logger:
-        return get_logger(f"{cls.__module__}.{cls.__name__}")
