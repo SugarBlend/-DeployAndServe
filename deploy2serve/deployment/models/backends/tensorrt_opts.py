@@ -5,13 +5,30 @@ from pydantic import BaseModel, Field, field_validator
 from ultralytics.utils.checks import check_version
 
 from deploy2serve.deployment.models.common import Plugin, Precision, ModelMeta
-from deploy2serve.utils.logger import get_logger, logging
 from deploy2serve.deployment.models.dataset import Dataset
 
 
 class SpecificOptions(BaseModel, metaclass=ModelMeta):
-    log_level: Union[trt.Logger.Severity, str] = Field(
-        default="WARNING", description="Logging level in build engine step."
+    # trt.IBuilderConfig
+    tiling_optimization_level: Union[str, trt.TilingOptimizationLevel] = Field(
+        default="NONE", description="The optimization level of tiling strategies. A Higher level allows TensorRT to "
+                                    "spend more time searching for better optimization strategy. Possible values: "
+                                    "'FAST', 'FULL', 'MODERATE', 'NONE'."
+    )
+    profiling_verbosity: Optional[Union[str, trt.ProfilingVerbosity]] = Field(
+        default="LAYER_NAMES_ONLY",
+        description="List of verbosity levels of layer information exposed in NVTX "
+        "annotations and in IEngineInspector. Possible values: 'DETAILED', 'LAYER_NAMES_ONLY', 'NONE'.",
+    )
+    compatibility_level: Optional[Union[str, "trt.HardwareCompatibilityLevel"]] = Field(
+        default="SAME_COMPUTE_CAPABILITY",
+        description="Hardware compatibility allows an engine compatible with GPU architectures other than that of the "
+                    "GPU on which the engine was built. "
+                    "Possible values: 'AMPERE_PLUS', 'NONE', 'SAME_COMPUTE_CAPABILITY'.",
+    )
+    flags: Optional[List[Union[str, trt.BuilderFlag]]] = Field(
+        default=None, description="The build mode flags to turn on builder options for this network. "
+                                  "The flags are listed in the BuilderFlags enum."
     )
     precision: Optional[Union[Precision, trt.BuilderFlag]] = Field(
         default=Precision.FP16, description="Precision of layers weights."
@@ -20,30 +37,48 @@ class SpecificOptions(BaseModel, metaclass=ModelMeta):
         default=None, description="Inputs shapes for network for optimization."
     )
     workspace: int = Field(default=int(1 << 30) // 4, description="Allowed memory workspace for using in build step.")
-    flags: Optional[List[Union[str, trt.BuilderFlag]]] = Field(
-        default=None, description="Flag in trt.BuilderFlag format."
-    )
-    profiling_verbosity: Optional[Union[str, trt.ProfilingVerbosity]] = Field(
-        default="LAYER_NAMES_ONLY",
-        description="List of verbosity levels of layer information exposed in NVTX "
-        "annotations and in IEngineInspector.",
-    )
-    max_aux_streams: int = Field(default=4, description="")
-    runtime_platform: Optional[Union[str, "trt.RuntimePlatform"]] = Field(
-        default=None,
-        description="Describes the intended runtime platform (operating system and CPU "
-        "architecture) for the execution of the TensorRT engine.",
-    )
-    compatibility_level: Optional[Union[str, "trt.HardwareCompatibilityLevel"]] = Field(
-        default="SAME_COMPUTE_CAPABILITY",
-        description="Describes requirements of compatibility with GPU architectures "
-        "other than that of the GPU on which the engine was built.",
-    )
+
     tactics: Optional[List[Union[str, trt.TacticSource]]] = Field(
         default=None, description="List of using tactics for optimizations."
     )
+    max_aux_streams: int = Field(
+        default=4, description="The maximum number of auxiliary streams that TRT is allowed to use. If the network "
+                               "contains operators that can run in parallel, TRT can execute them using auxiliary "
+                               "streams in addition to the one provided to the IExecutionContext::enqueueV3() call. "
+                               "The default maximum number of auxiliary streams is determined by the heuristics in "
+                               "TensorRT on whether enabling multi-stream would improve the performance. This behavior "
+                               "can be overridden by calling this API to set the maximum number of auxiliary streams "
+                               "explicitly. Set this to 0 to enforce single-stream inference. The resulting engine may "
+                               "use fewer auxiliary streams than the maximum if the network does not contain enough "
+                               "parallelism or if TensorRT determines that using more auxiliary streams does not help "
+                               "improve the performance. Allowing more auxiliary streams does not always give better "
+                               "performance since there will be synchronizations overhead between streams. Using CUDA "
+                               "graphs at runtime can help reduce the overhead caused by cross-stream synchronizations. "
+                               "Using more auxiliary leads to more memory usage at runtime since some activation memory "
+                               "blocks will not be able to be reused."
+    )
+    avg_timing_iterations: int = Field(
+        default=4, description="The number of averaging iterations used when timing layers. When timing layers, the "
+                               "builder minimizes over a set of average times for layer execution. This parameter "
+                               "controls the number of iterations used in averaging. By default the number of "
+                               "averaging iterations is 1."
+    )
+    runtime_platform: Optional[Union[str, "trt.RuntimePlatform"]] = Field(
+        default=None,
+        description="Describes the intended runtime platform (operating system and CPU "
+        "architecture) for the execution of the TensorRT engine. Possible values: 'SAME_AS_BUILD', 'WINDOWS_AMD64'.",
+    )
+
+    # trt.Builder
+    log_level: Union[trt.Logger.Severity, str] = Field(
+        default="WARNING", description="Logging level in build engine step."
+    )
+
+    # trt.IInt8Calibrator
     algorithm: Union[str, trt.CalibrationAlgoType] = Field(
-        default="ENTROPY_CALIBRATION_2", description="Algorithm for calibration layers."
+        default="ENTROPY_CALIBRATION_2",
+        description="Algorithm for calibration layers. Possible values: 'ENTROPY_CALIBRATION', "
+                    "'ENTROPY_CALIBRATION_2', 'LEGACY_CALIBRATION', 'MINMAX_CALIBRATION'."
     )
 
     @field_validator("log_level", mode="before")
@@ -67,6 +102,19 @@ class SpecificOptions(BaseModel, metaclass=ModelMeta):
         if isinstance(val, str):
             try:
                 val = getattr(trt.ProfilingVerbosity, val.upper())
+            except AttributeError as error:
+                cls.logger.warning(error)
+                val = None
+        return val
+
+    @field_validator("tiling_optimization_level", mode="before")
+    def parse_tiling_optimization_level(
+        cls,
+        val: Optional[Union[str, trt.TilingOptimizationLevel]]
+    ) -> trt.TilingOptimizationLevel:
+        if isinstance(val, str):
+            try:
+                val = getattr(trt.TilingOptimizationLevel, val.upper())
             except AttributeError as error:
                 cls.logger.warning(error)
                 val = None
@@ -133,6 +181,7 @@ class SpecificOptions(BaseModel, metaclass=ModelMeta):
 
     class Config:
         arbitrary_types_allowed = True
+        validate_default = True
 
 
 class TensorrtConfig(BaseModel):
@@ -151,3 +200,4 @@ class TensorrtConfig(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
+        validate_default = True

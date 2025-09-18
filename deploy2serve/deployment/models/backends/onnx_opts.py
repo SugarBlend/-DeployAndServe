@@ -61,6 +61,11 @@ class NvidiaModelOpt(BaseModel, metaclass=ModelMeta):
                 val.pop(i)
         return val
 
+    class Config:
+        arbitrary_types_allowed = True
+        validate_default = True
+
+
 class SpecificOptions(BaseModel):
     keep_initializers_as_inputs: bool = Field(
         default=False,
@@ -121,6 +126,7 @@ class SpecificOptions(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
+        validate_default = True
 
 
 class OnnxConfig(BaseModel):
@@ -136,3 +142,4 @@ class OnnxConfig(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
+        validate_default = True

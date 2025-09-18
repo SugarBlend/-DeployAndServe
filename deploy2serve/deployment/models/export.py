@@ -62,3 +62,7 @@ class ExportConfig(BaseModel, metaclass=ModelMeta):
             raise NotImplementedError("At now support configuration files with such extensions: '.json', '.yml'.")
 
         return ExportConfig.model_validate(data)
+
+    class Config:
+        arbitrary_types_allowed = True
+        validate_default = True

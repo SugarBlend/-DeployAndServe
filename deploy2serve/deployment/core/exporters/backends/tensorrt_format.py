@@ -83,11 +83,11 @@ class TensorRTExporter(BaseExporter):
             t(lambda: context.execute_v2(list(binding_address.values())))
 
     def _add_optimization_profiles(
-            self,
-            builder: trt.Builder,
-            config: trt.IBuilderConfig,
-            network: trt.INetworkDefinition,
-            logger: logging.Logger
+        self,
+        builder: trt.Builder,
+        config: trt.IBuilderConfig,
+        network: trt.INetworkDefinition,
+        logger: logging.Logger
     ) -> trt.IBuilderConfig:
         profile = builder.create_optimization_profile()
 
@@ -106,15 +106,17 @@ class TensorRTExporter(BaseExporter):
         return config
 
     def _apply_builder_flags(
-            self,
-            builder: trt.Builder,
-            config: trt.IBuilderConfig,
-            logger: trt.Logger
+        self,
+        builder: trt.Builder,
+        config: trt.IBuilderConfig,
+        logger: trt.Logger
     ) -> Tuple[trt.IBuilderConfig, trt.Builder]:
         config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, self.config.tensorrt.specific.workspace)
         if self.config.tensorrt.specific.profiling_verbosity:
             config.profiling_verbosity = self.config.tensorrt.specific.profiling_verbosity
-        config.avg_timing_iterations = 8
+        config.avg_timing_iterations = self.config.tensorrt.specific.avg_timing_iterations
+        if self.config.tensorrt.specific.tiling_optimization_level:
+            config.tiling_optimization_level = self.config.tensorrt.specific.tiling_optimization_level
 
         if check_version(trt.__version__, ">=9.1.0"):
             if self.config.tensorrt.specific.runtime_platform:

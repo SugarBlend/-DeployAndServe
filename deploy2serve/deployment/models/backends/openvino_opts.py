@@ -17,3 +17,4 @@ class OpenVINOConfig(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
+        validate_default = True
