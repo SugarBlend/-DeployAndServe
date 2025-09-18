@@ -4,14 +4,12 @@ import tensorrt as trt
 from pydantic import BaseModel, Field, field_validator
 from ultralytics.utils.checks import check_version
 
-from deploy2serve.deployment.models.common import Plugin, Precision
+from deploy2serve.deployment.models.common import Plugin, Precision, ModelMeta
 from deploy2serve.utils.logger import get_logger, logging
 from deploy2serve.deployment.models.dataset import Dataset
 
 
-class SpecificOptions(BaseModel):
-    logger: logging.Logger = get_logger("pydantic", logging.INFO)
-
+class SpecificOptions(BaseModel, metaclass=ModelMeta):
     log_level: Union[trt.Logger.Severity, str] = Field(
         default="WARNING", description="Logging level in build engine step."
     )

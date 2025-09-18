@@ -2,10 +2,10 @@ from pydantic import BaseModel, Field, field_validator
 from torch.onnx import _C_onnx
 from typing import Any, List, Mapping, Optional, Sequence, Union
 
-from deploy2serve.deployment.models.common import Plugin
+from deploy2serve.deployment.models.common import Plugin, ModelMeta
 
 
-class NvidiaModelOpt(BaseModel):
+class NvidiaModelOpt(BaseModel, metaclass=ModelMeta):
     quant_mode: str = Field(description="Quantization mode. One of 'int8', 'int4' and 'fp8'.")
     calib_method: str = Field(
         description="Calibration method choices. Options are int8/fp8: {'entropy' (default), 'max'} and "
@@ -31,17 +31,34 @@ class NvidiaModelOpt(BaseModel):
                                                       "ONNX model's conversion/calibration.")
 
     @field_validator("quant_mode", mode="before")
-    def parse_quant_mode(cls, val: Any) -> str:
+    def parse_quant_mode(cls, val: str) -> str:
         available_modes = ["int8", "int4", "fp8"]
         if val not in available_modes:
             raise Exception(f"Unknown quantization mode: {val}. Available modes: {available_modes}.")
         return val
 
     @field_validator("calib_method", mode="before")
-    def parse_calib_method(cls, val: Any) -> str:
+    def parse_calib_method(cls, val: str) -> str:
         available_calib_methods = ["entropy", "max", "awq_clip", "awq_lite", "awq_full", "rtn_dq"]
         if val not in available_calib_methods:
             raise Exception(f"Unknown calib method: {val}. Available methods: {available_calib_methods}.")
+        return val
+
+    @field_validator("calibration_eps", mode="before")
+    def parse_calibration_eps(cls, val: List[str]) -> List[str]:
+        import onnxruntime as ort
+        correspondence = {
+            "trt": "TensorrtExecutionProvider",
+            "cuda": "CUDAExecutionProvider",
+            "cpu": "CPUExecutionProvider"
+        }
+        available_eps = ort.get_available_providers()
+        for i in range(len(val) - 1, -1, -1):
+            ep = correspondence.get(val[i])
+            if not ep or ep not in available_eps:
+                cls.logger.warning(f"It is not possible to use this provider: '{val[i]}' because the installed package "
+                                   f"does not support it.")
+                val.pop(i)
         return val
 
 class SpecificOptions(BaseModel):

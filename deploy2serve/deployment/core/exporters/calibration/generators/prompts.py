@@ -1,15 +1,11 @@
 from deploy2serve.deployment.core.exporters.calibration.generators.interface import LabelsGenerator
-from pathlib import Path
 import ollama
 import yaml
 from tqdm import trange
-from typing import Any, Union, Dict, List
+from typing import Any, Dict, List
 
 
 class PromptGenerator(LabelsGenerator):
-    def __init__(self, dataset_folder: Union[str, Path]) -> None:
-        super().__init__(dataset_folder)
-
     def generate_labels(self) -> Dict[str, Any]:
         cache = self.dataset_folder.joinpath("prompts_cache.yml")
         cache.parent.mkdir(parents=True, exist_ok=True)

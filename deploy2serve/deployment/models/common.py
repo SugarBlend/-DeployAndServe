@@ -2,6 +2,7 @@ from enum import Enum
 from typing import Any, Dict
 
 from pydantic import BaseModel, Field
+from deploy2serve.utils.logger import get_logger
 
 
 class Precision(str, Enum):
@@ -20,6 +21,17 @@ class Backend(str, Enum):
     TorchScript = "torchscript"
     OpenVINO = "openvino"
     ONNX = "onnx"
+
+
+class LoggingMeta(type):
+    def __new__(cls, name, bases, attrs):
+        new_class = super().__new__(cls, name, bases, attrs)
+        new_class.logger = get_logger(f"{attrs.get('__module__', '')}.{name}")
+        return new_class
+
+
+class ModelMeta(LoggingMeta, type(BaseModel)):
+    pass
 
 
 class Plugin(BaseModel):

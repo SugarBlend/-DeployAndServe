@@ -40,8 +40,8 @@ exporter:
 tensorrt:
   specific:
     log_level: INFO
-    precision: int8
-    workspace: 4_294_967_296
+    precision: fp16
+    workspace: 134_217_728
     flags:
       - TF32
       - DIRECT_IO
@@ -57,7 +57,7 @@ tensorrt:
     calibration_frames: null
     exclude_frames: [ ]
     labels_generator:
-      module_path: deploy2serve.deployment.projects.kandinsky_2.prompt_generator
+      module_path: deploy2serve.deployment.core.exporters.calibration.generators.prompts
       class_name: PromptGenerator
     data_storage:
       module_path: deploy2serve.deployment.core.exporters.calibration.dataset.zarr_dataset

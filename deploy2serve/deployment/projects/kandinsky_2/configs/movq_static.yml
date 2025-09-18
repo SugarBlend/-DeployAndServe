@@ -15,7 +15,7 @@ output_nodes:
     precision: float16
 device: cuda:0
 repeats: 10
-enable_benchmark: true
+enable_benchmark: false
 enable_visualization: false
 
 executor:
@@ -28,8 +28,8 @@ exporter:
 tensorrt:
   specific:
     log_level: INFO
-    precision: int8
-    workspace: 3_221_225_472
+    precision: fp16
+    workspace: 536_870_912
     flags:
       - TF32
       - DIRECT_IO
@@ -45,7 +45,7 @@ tensorrt:
     calibration_frames: null
     exclude_frames: [ ]
     labels_generator:
-      module_path: deploy2serve.deployment.projects.kandinsky_2.prompt_generator
+      module_path: deploy2serve.deployment.core.exporters.calibration.generators.prompts
       class_name: PromptGenerator
     data_storage:
       module_path: deploy2serve.deployment.core.exporters.calibration.dataset.zarr_dataset

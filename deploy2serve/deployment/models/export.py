@@ -5,14 +5,14 @@ import torch.cuda
 import yaml
 from pydantic import BaseModel, Field, field_validator
 
-from deploy2serve.deployment.models.common import Backend, OverrideClassSpec
+from deploy2serve.deployment.models.common import Backend, OverrideClassSpec, ModelMeta
 from deploy2serve.deployment.models.backends.onnx_opts import OnnxConfig
 from deploy2serve.deployment.models.backends.openvino_opts import OpenVINOConfig
 from deploy2serve.deployment.models.backends.tensorrt_opts import TensorrtConfig
 from deploy2serve.deployment.models.backends.torchscript_opts import TorchScriptConfig
 
 
-class ExportConfig(BaseModel):
+class ExportConfig(BaseModel, metaclass=ModelMeta):
     weights_path: Optional[str] = Field(description="Path to original weights of the model which you want to convert.")
     config_path: Optional[str] = Field(description="Path to additional configuration file for difficult cases of model initialization.")
 
@@ -45,8 +45,9 @@ class ExportConfig(BaseModel):
 
     @field_validator("device", mode="before")
     def parse_device(cls, val: str) -> str:
-        if "cuda" in val:
-            assert torch.cuda.is_available(), "Pytorch compiled without CUDA"
+        if "cuda" in val and not torch.cuda.is_available():
+            cls.logger.warning("Pytorch compiled without CUDA. Force set to CPU device.")
+            return "cpu"
         return val
 
     @classmethod
