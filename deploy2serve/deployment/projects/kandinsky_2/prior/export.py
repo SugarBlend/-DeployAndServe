@@ -13,7 +13,9 @@ from typing import Any, Generator, Optional
 @ExporterFactory.register(Backend.ONNX)
 class OverrideONNX(ONNXExporter):
     def register_batcher(self) -> Optional[BaseBatcher]:
-        pass
+        input_node = list(self.config.input_nodes)[0]
+        ch, sequence_len = self.config.input_nodes[input_node]["shape"]
+        return PriorBatcher(self.config, "kandinsky-prior", (ch, sequence_len))
 
     @contextmanager
     def patch_ops(self) -> Generator[None, Any, None]:
@@ -27,8 +29,8 @@ class OverrideONNX(ONNXExporter):
 class OverrideTensorRT(TensorRTExporter):
     def register_batcher(self) -> Optional[BaseBatcher]:
         input_node = list(self.config.input_nodes)[0]
-        shape = self.config.input_nodes[input_node]["shape"]
-        return PriorBatcher(self.config, "kandinsky-prior", shape[-2:])
+        ch, sequence_len = self.config.input_nodes[input_node]["shape"]
+        return PriorBatcher(self.config, "kandinsky-prior", (ch, sequence_len))
 
     def register_tensorrt_plugins(self, network: trt.INetworkDefinition) -> trt.INetworkDefinition:
         return network

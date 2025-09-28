@@ -1,4 +1,3 @@
-import random
 from deploy2serve.deployment.core.exporters.calibration.batcher import BaseBatcher
 from deploy2serve.deployment.models.export import ExportConfig
 from diffusers import KandinskyV22PriorPipeline, KandinskyV22Pipeline
@@ -89,13 +88,13 @@ class UnetBatcher(BaseBatcher):
         )
 
         self.decoder._num_timesteps = len(timesteps)
-        restrict_value = random.choice(timesteps)
+        # restrict_value = random.choice(timesteps)
         for i, t in enumerate(timesteps):
             # expand the latents if we are doing classifier free guidance
             latent_model_input = torch.cat([latents] * 2) if self.decoder.do_classifier_free_guidance else latents
-            if restrict_value == t:
-                args = [latent_model_input, torch.tensor([t]), image_embeds]
-                break
+            # if restrict_value == t:
+            args = [latent_model_input, torch.tensor([t]), image_embeds]
+            #     break
         torch.cuda.empty_cache()
         torch.cuda.ipc_collect()
         return {

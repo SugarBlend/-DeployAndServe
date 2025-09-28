@@ -49,9 +49,9 @@ class BaseBatcher(ABC):
         )
 
         if self.config.tensorrt.dataset.calibration_frames:
-            self.total_frames = min(max(dataset.num_samples.values()), self.config.tensorrt.dataset.calibration_frames)
+            self.total_frames = min(dataset.num_samples, self.config.tensorrt.dataset.calibration_frames)
         else:
-            self.total_frames = max(dataset.num_samples.values())
+            self.total_frames = dataset.num_samples
         self.total_frames = floor(self.total_frames / self.batch_size) + 1
 
     def check_dataset_file(self, dataset_name: str) -> ChunkedDataset:
@@ -72,14 +72,14 @@ class BaseBatcher(ABC):
         if dataset.filename.exists():
             dataset.from_file()
             for node in self.config.input_nodes:
-                shape = dataset.data_shape.get(node)
-                if not dataset.num_samples.get(node) or shape is None:
+                shape = dataset.default_shapes.get(node)
+                if not dataset.num_samples or shape is None:
                     self.logger.warning(f"Missing data for input node '{node}' — regenerating dataset.")
                     needs_regeneration = True
                     break
 
                 node_shape = self.config.input_nodes[node]["shape"]
-                if shape[1:] != shape[1:]:
+                if tuple(shape[1:]) != node_shape[1:]:
                     self.logger.warning(
                         f"Shape mismatch for node '{node}': expected {node_shape[1:]}, got {shape[1:]}."
                     )
@@ -156,4 +156,5 @@ class BaseBatcher(ABC):
                 break
             if idx in self.config.tensorrt.dataset.exclude_frames:
                 continue
-            yield [item.to(device=self.config.device, dtype=self.dtype) for item in items]
+            yield [items[node].to(device=self.config.device, dtype=self.dtype).squeeze(axis=0)
+                   for node in self.config.input_nodes]

@@ -6,9 +6,9 @@ import os
 import onnx
 from onnx.external_data_helper import convert_model_to_external_data
 import onnxslim
-import shutil
 import torch
 import tempfile
+from collections import defaultdict
 from typing import Any, Dict, Optional, Tuple, List
 
 from deploy2serve.deployment.core.exporters.base import BaseExporter, ExportConfig, ExporterFactory
@@ -178,11 +178,10 @@ class ONNXExporter(BaseExporter):
                     config_path=self.config.config_path, weights_path=self.config.weights_path
                 )
             self.torch2onnx()
-        else:
-            if self.config.onnx.simplify:
-                self.simplify()
-            if self.config.onnx.modelopt.quant_mode and self.config.onnx.modelopt.calib_method:
-                self.quantize()
+        if self.config.onnx.simplify:
+            self.simplify()
+        if self.config.onnx.modelopt:
+            self.quantize()
 
     def torch2onnx(self) -> None:
         self.logger.info("Try convert PyTorch model to ONNX format")
@@ -204,12 +203,12 @@ class ONNXExporter(BaseExporter):
             onnx.checker.check_model(temp_onnx_path.as_posix(), full_check=True)
             onnx_model = onnx.load_model(temp_onnx_path.as_posix())
             convert_model_to_external_data(
-                onnx_model, all_tensors_to_one_file=True, location="model.data", size_threshold=0,
+                onnx_model, all_tensors_to_one_file=True, location="onnx_model.data", size_threshold=0,
                 convert_attribute=False
             )
             onnx.save_model(
                 onnx_model, self.save_path.as_posix(), save_as_external_data=True, all_tensors_to_one_file=True,
-                location="model.data", size_threshold=0,
+                location="onnx_model.data", size_threshold=0,
             )
             onnx.checker.check_model(self.save_path, full_check=True)
             self.logger.info(f"ONNX model successfully stored in: {self.save_path}")
@@ -238,44 +237,37 @@ class ONNXExporter(BaseExporter):
 
         self.logger.info("Try to apply Post Training Quantization for ONNX model")
         calibration_data: Optional[Dict[str, List[np.ndarray]]] = None
+
         if self.batcher:
-            calibration_data = {node: [] for node in self.config.input_nodes}
-            for i, items in enumerate(self.batcher.dataloader):
+            calibration_data = defaultdict(list)
+            for i, inputs in enumerate(self.batcher.dataloader):
                 if i == self.config.onnx.modelopt.calib_buffer:
                     break
-                for j, item in enumerate(items):
-                    calibration_data[list(self.config.input_nodes)[j]].append(item.cpu().numpy())
+                [calibration_data[node].append(val.to(device="cpu").numpy().squeeze(axis=0))
+                 for node, val in inputs.items()]
+
+            for node in calibration_data:
+                dtype = np.dtype(self.config.input_nodes[node]["precision"])
+                calibration_data[node] = np.concatenate(calibration_data[node], axis=0, dtype=dtype)
         else:
             self.logger.warning("The implementation of the calibration data batcher is not defined. Random data will "
                                 "be used, and the calibration quality will be significantly degraded.")
 
-        dtype = np.float16 if self.config.enable_mixed_precision else np.float32
-        for node in calibration_data:
-            calibration_data[node] = np.concatenate(calibration_data[node], axis=0).astype(dtype)
-
-        short_dtype = "fp16" if self.config.enable_mixed_precision else "fp32"
-        temp_dir = tempfile.mkdtemp("onnx_quant_cache_")
         try:
             quantize_top_level_api(
                 onnx_path=self.save_path.as_posix(),
                 quantize_mode=self.config.onnx.modelopt.quant_mode,
                 calibration_method=self.config.onnx.modelopt.calib_method,
                 calibration_data=calibration_data,
-                calibration_cache_path=temp_dir,
                 calibration_eps=self.config.onnx.modelopt.calibration_eps,
                 use_external_data_format=self.config.onnx.modelopt.use_external_data_format,
                 op_types_to_quantize=self.config.onnx.modelopt.op_types_to_quantize,
                 nodes_to_exclude=self.config.onnx.modelopt.nodes_to_exclude,
                 dq_only=not self.config.onnx.modelopt.qdq_for_weights,
                 verbose=True,
-                high_precision_dtype=short_dtype,
-                mha_accumulation_dtype=short_dtype,
-                enable_gemv_detection_for_trt=False,
-                enable_shared_constants_duplication=False,
             )
             self.config.onnx.output_file = self.save_path.with_suffix(".quant.onnx").as_posix()
             self.logger.info(f"Quantization successfully done. ONNX model successfully stored "
                              f"in: {self.config.onnx.output_file}")
         except Exception as error:
-            shutil.rmtree(temp_dir)
             self.logger.critical(f"Catch error while apply optimizations: {error}")

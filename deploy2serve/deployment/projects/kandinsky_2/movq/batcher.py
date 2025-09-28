@@ -26,7 +26,8 @@ class MOVQBatcher(BaseBatcher):
             cache_dir="/tmp/kandinsky2",
             low_cpu_mem_usage=True
         )
-        self.encoder.to(device=self.config.device, dtype=dtype)
+        # TODO: Deallocate
+        # self.encoder.to(device=self.config.device, dtype=dtype)
 
         self.decoder = KandinskyV22Pipeline.from_pretrained(
             "kandinsky-community/kandinsky-2-2-decoder",
@@ -34,6 +35,7 @@ class MOVQBatcher(BaseBatcher):
             cache_dir="/tmp/kandinsky2",
             low_cpu_mem_usage=True
         )
+        # TODO: Deallocate
         self.decoder.to(device=self.config.device, dtype=dtype)
 
     @torch.no_grad()

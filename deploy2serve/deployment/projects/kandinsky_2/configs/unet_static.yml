@@ -20,8 +20,8 @@ output_nodes:
     shape: [2, 8, 96, 96]
     precision: float16
 device: cuda:0
-repeats: 10
-enable_benchmark: true
+repeats: 100
+enable_benchmark: false
 enable_visualization: false
 
 executor:
@@ -34,18 +34,19 @@ exporter:
 tensorrt:
   specific:
     log_level: INFO
-    precision: fp16
-    workspace: 268435456
+    precision: int8
+    workspace: 2_684_354_560
     flags:
       - TF32
       - DIRECT_IO
-      - PREFER_PRECISION_CONSTRAINTS
+      - OBEY_PRECISION_CONSTRAINTS
       - SPARSE_WEIGHTS
+    builder_optimization_level: 5
+    tiling_optimization_level: FULL
     profiling_verbosity: NONE
     max_aux_streams: 4
     runtime_platform: null
     compatibility_level: null
-    tactics: null
     algorithm: ENTROPY_CALIBRATION_2
   dataset:
     calibration_frames: null
@@ -68,26 +69,25 @@ onnx:
     verbose: null
     input_names: [latent, timestep, image_embeds]
     output_names: [noise]
-    opset_version: 19
+    opset_version: 21
     training: EVAL
     do_constant_folding: true
-#  modelopt:
-#    quant_mode: int8
-#    calib_method: max
-#    calib_buffer: 500
-#    calibration_eps:
-#      - cuda
-#      - cpu
-#      - dml
-#    op_types_to_quantize:
-#      - Conv
-#      - MatMul
-#    nodes_to_exclude:
-#      - /Shape
-#      - /LayerNormalization
-#    qdq_for_weights: false
-#    use_external_data_format: false
-#    keep_intermediate_files: false
+  modelopt:
+    quant_mode: int8
+    calib_method: entropy
+    calib_buffer: 1000
+    calibration_eps:
+      - cuda
+      - cpu
+      - dml
+    op_types_to_quantize:
+      - MatMul
+      - Gemm
+      - Resize
+      - AveragePool
+    qdq_for_weights: false
+    use_external_data_format: false
+    keep_intermediate_files: true
   simplify: false
   output_file: checkpoints/kandinsky_2/unet/onnx/model.onnx
-  force_rebuild: true
+  force_rebuild: false

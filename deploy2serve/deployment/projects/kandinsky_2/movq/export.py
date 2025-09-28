@@ -13,7 +13,9 @@ from typing import Any, Generator, Optional
 @ExporterFactory.register(Backend.ONNX)
 class OverrideONNX(ONNXExporter):
     def register_batcher(self) -> Optional[BaseBatcher]:
-        return None
+        input_node = list(self.config.input_nodes)[0]
+        batch, _, h, w = self.config.input_nodes[input_node]["shape"]
+        return MOVQBatcher(self.config, "kandinsky-movq", (h, w))
 
     @contextmanager
     def patch_ops(self) -> Generator[None, Any, None]:

@@ -18,6 +18,9 @@ class PromptGenerator(LabelsGenerator):
         self.concurrent_requests = 3
         self.model: str = "mistral"
         self.timeout = aiohttp.ClientTimeout(total=120)
+        self.generation_prompt: str = f"""Generate exactly {self.batch_size} unique image generation prompts. Each 
+        prompt must be on a separate line. Format: [Genre/Theme] [Main Subject], [Art Style], [Technical Details]."""
+
 
     @staticmethod
     def _filter_prompts(content: str) -> List[str]:
@@ -47,15 +50,12 @@ class PromptGenerator(LabelsGenerator):
         retry=retry_if_exception_type((aiohttp.ClientError, asyncio.TimeoutError))
     )
     async def _generate_with_fallback(self, session: aiohttp.ClientSession, batch_id: int) -> List[str]:
-        prompt_content = f"""Generate exactly {self.batch_size} unique image generation prompts. Each prompt must be 
-        on a separate line. Format: [Genre/Theme] [Main Subject], [Art Style], [Technical Details]."""
-
         try:
             async with session.post(
                     "http://localhost:11434/api/chat",
                     json={
                         "model": self.model,
-                        "messages": [{"role": "user", "content": prompt_content}],
+                        "messages": [{"role": "user", "content": self.generation_prompt}],
                         "options": {"temperature": 0.9, "num_predict": 2000},
                         "stream": False
                     },
