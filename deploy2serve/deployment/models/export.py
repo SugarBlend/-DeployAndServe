@@ -76,7 +76,7 @@ class ExportConfig(BaseModel, metaclass=ModelMeta):
         if path.endswith(".json"):
             with open(path, "r", encoding="utf-8") as file:
                 data = json.load(file)
-        elif path.endswith(".yml"):
+        elif path.endswith(".yaml"):
             with open(path, "r", encoding="utf-8") as file:
                 data = yaml.safe_load(file)
         else:

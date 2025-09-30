@@ -6,7 +6,7 @@ import torch
 from typing import Any, Optional, List, Union
 
 
-class PriorBatcher(BaseBatcher):
+class PriorTransformerBatcher(BaseBatcher):
     tokenizer: CLIPTokenizer
     pipeline: KandinskyV22PriorPipeline
 

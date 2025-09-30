@@ -5,24 +5,15 @@ formats:
   - tensorrt
 enable_mixed_precision: true
 input_nodes:
-  latent:
-    shape: [2, 1280]
-    precision: float16
-  timestep:
-    shape: [1,]
+  input_ids:
+    shape: [1, 77]
     precision: int64
-  prompt_embeds:
-    shape: [2, 1280]
-    precision: float16
-  encoder_hidden_states:
-    shape: [2, 77, 1280]
-    precision: float16
-  attention_mask:
-    shape: [2, 77]
-    precision: bool
 output_nodes:
-  image_embeds:
-    shape: [2, 1280]
+  last_hidden_state:
+    shape: [1, 77, 1280]
+    precision: float16
+  text_embeds:
+    shape: [1, 1280]
     precision: float16
 device: cuda:0
 repeats: 1000
@@ -30,11 +21,11 @@ enable_benchmark: false
 enable_visualization: false
 
 executor:
-  module: deploy2serve.deployment.projects.kandinsky_2.prior.executor
-  class_name: PriorExecutor
+  module: deploy2serve.deployment.projects.kandinsky_2.text_encoder.executor
+  class_name: TextEncoderExecutor
 exporter:
-  module: deploy2serve.deployment.projects.kandinsky_2.prior.export
-  class_name: PriorExporter
+  module: deploy2serve.deployment.projects.kandinsky_2.text_encoder.export
+  class_name: TextEncoderExporter
 
 calibration:
   calibration_frames: 1000
@@ -51,13 +42,16 @@ tensorrt:
   specific:
     log_level: INFO
     precision: int8
-    workspace: 134_217_728
+    workspace: 1_073_741_824
     flags:
       - TF32
       - DIRECT_IO
       - OBEY_PRECISION_CONSTRAINTS
       - SPARSE_WEIGHTS
+    network_creation_flag:
+      - EXPLICIT_BATCH
     builder_optimization_level: 5
+    tiling_optimization_level: FULL
     profiling_verbosity: NONE
     max_aux_streams: 4
     runtime_platform: null
@@ -65,7 +59,7 @@ tensorrt:
     algorithm: ENTROPY_CALIBRATION_2
   enable_timing_cache: true
   enable_calibration_cache: true
-  output_file: checkpoints/kandinsky_2/prior/tensorrt/model.plan
+  output_file: checkpoints/kandinsky_2/text_encoder/tensorrt/model.plan
   force_rebuild: true
 
 onnx:
@@ -73,9 +67,9 @@ onnx:
     keep_initializers_as_inputs: false
     export_params: true
     verbose: null
-    input_names: [latent, timestep, prompt_embeds, encoder_hidden_states, attention_mask]
-    output_names: [image_embeds]
-    opset_version: 20
+    input_names: [input_ids]
+    output_names: [last_hidden_state, text_embeds]
+    opset_version: 21
     training: EVAL
     do_constant_folding: true
   modelopt:
@@ -86,11 +80,10 @@ onnx:
       - cpu
       - dml
     op_types_to_quantize:
-      - Gemm
       - MatMul
     qdq_for_weights: false
     use_external_data_format: false
-    keep_intermediate_files: true
+    keep_intermediate_files: false
   simplify: false
-  output_file: checkpoints/kandinsky_2/prior/onnx/model.onnx
+  output_file: checkpoints/kandinsky_2/text_encoder/onnx/model.onnx
   force_rebuild: true

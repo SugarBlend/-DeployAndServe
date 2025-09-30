@@ -5,7 +5,7 @@ import torch
 from typing import Any
 
 
-class CLIPBatcher(BaseBatcher):
+class TextEncoderBatcher(BaseBatcher):
     tokenizer: CLIPTokenizer
 
     def load_preprocess(self) -> None:
