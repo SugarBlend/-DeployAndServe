@@ -1,8 +1,11 @@
 from enum import Enum
-from typing import Any, Dict
+import importlib
+from typing import Any, Dict, Annotated
+from pathlib import Path
+from pydantic import AfterValidator
 
-from pydantic import BaseModel, Field
-from deploy2serve.utils.logger import get_logger
+from pydantic import BaseModel, Field, field_validator, ValidationInfo
+from deploy2serve.utils.logger import get_logger, get_project_root
 
 
 class Precision(str, Enum):
@@ -34,11 +37,47 @@ class ModelMeta(LoggingMeta, type(BaseModel)):
     pass
 
 
+def resolve_relative_path(v: Path) -> Path:
+    if v.is_absolute():
+        return v
+    return get_project_root().joinpath(v)
+
+ResolvedPath = Annotated[Path, AfterValidator(resolve_relative_path)]
+
+
 class Plugin(BaseModel):
     name: str = Field(description="User name of plugin.")
     options: Dict[str, Any] = Field(description="Additional settings for plugin")
 
 
-class OverrideClassSpec(BaseModel):
-    module_path: str = Field(description="Dot-path to the module containing the override class.")
+class ComponentOverride(BaseModel, metaclass=ModelMeta):
+    module: str = Field(description="Dot-path to the module containing the override class.")
     class_name: str = Field(description="Name of the class implementing the override logic.")
+
+    @field_validator("module", mode="before")
+    def validate_module_safe(cls, val: str) -> str:
+        try:
+            importlib.import_module(val)
+            return val
+        except ImportError:
+            cls.logger.warning(f"Module '{val}' may not be available in current environment")
+            return val
+
+    @field_validator("class_name", mode="before")
+    def validate_class_safe(cls, val: str, info: ValidationInfo) -> str:
+        module_path = info.data.get('module')
+        if not module_path:
+            return val
+
+        try:
+            module = importlib.import_module(module_path)
+            if not hasattr(module, val):
+                cls.logger.warning(f"Class '{val}' not found in module '{module_path}'.")
+        except ImportError:
+            pass
+
+        return val
+
+    class Config:
+        arbitrary_types_allowed = True
+        validate_default = True

@@ -1,6 +1,5 @@
 weights_path: null
 config_path: null
-
 formats:
   - onnx
   - tensorrt
@@ -14,42 +13,44 @@ output_nodes:
     shape: [1, 3, 768, 768]
     precision: float16
 device: cuda:0
-repeats: 10
+repeats: 100
 enable_benchmark: false
 enable_visualization: false
 
 executor:
-  module_path: deploy2serve.deployment.projects.kandinsky_2.movq.executor
+  module: deploy2serve.deployment.projects.kandinsky_2.movq.executor
   class_name: MOVQExecutor
 exporter:
-  module_path: deploy2serve.deployment.projects.kandinsky_2.movq.export
+  module: deploy2serve.deployment.projects.kandinsky_2.movq.export
   class_name: MOVQExporter
+
+calibration:
+  calibration_frames: 1000
+  excluded_frames: [ ]
+  labels_generator:
+    module: deploy2serve.deployment.core.exporters.calibration.generators.prompts
+    class_name: PromptGenerator
+  storage:
+    module: deploy2serve.deployment.core.exporters.calibration.dataset.zarr_dataset
+    class_name: ZarrChunkedDataset
+  cache_path: checkpoints/
 
 tensorrt:
   specific:
     log_level: INFO
-    precision: fp16
-    workspace: 536_870_912
+    precision: int8
+    workspace: 5_368_709_120
     flags:
       - TF32
       - DIRECT_IO
       - OBEY_PRECISION_CONSTRAINTS
       - SPARSE_WEIGHTS
+    builder_optimization_level: 5
     profiling_verbosity: NONE
     max_aux_streams: 4
     runtime_platform: null
     compatibility_level: null
-    tactics: null
     algorithm: ENTROPY_CALIBRATION_2
-  dataset:
-    calibration_frames: null
-    exclude_frames: [ ]
-    labels_generator:
-      module_path: deploy2serve.deployment.core.exporters.calibration.generators.prompts
-      class_name: PromptGenerator
-    data_storage:
-      module_path: deploy2serve.deployment.core.exporters.calibration.dataset.zarr_dataset
-      class_name: ZarrChunkedDataset
   enable_timing_cache: true
   enable_calibration_cache: true
   output_file: checkpoints/kandinsky_2/movq/tensorrt/model.plan
@@ -60,28 +61,25 @@ onnx:
     keep_initializers_as_inputs: false
     export_params: true
     verbose: null
-    input_names: [noise]
+    input_names: [latent]
     output_names: [prediction]
-    opset_version: 18
+    opset_version: 21
     training: EVAL
     do_constant_folding: true
-#  modelopt:
-#    quant_mode: fp8
-#    calib_method: max
-#    calib_buffer: 500
-#    calibration_eps:
-#      - cuda
-#      - cpu
-#      - dml
-#    op_types_to_quantize:
-#      - Conv
-#      - MatMul
-#    nodes_to_exclude:
-#      - /Shape
-#      - /LayerNormalization
-#    qdq_for_weights: false
-#    use_external_data_format: false
-#    keep_intermediate_files: false
+  modelopt:
+    quant_mode: int8
+    calib_method: entropy
+    calib_buffer: 1000
+    calibration_eps:
+      - cuda
+      - cpu
+      - dml
+    op_types_to_quantize:
+      - MatMul
+      - Resize
+    qdq_for_weights: false
+    use_external_data_format: false
+    keep_intermediate_files: false
   simplify: true
   output_file: checkpoints/kandinsky_2/movq/onnx/model.onnx
   force_rebuild: true

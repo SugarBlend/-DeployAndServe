@@ -13,9 +13,7 @@ from typing import Any, Generator, Optional
 @ExporterFactory.register(Backend.ONNX)
 class OverrideONNX(ONNXExporter):
     def register_batcher(self) -> Optional[BaseBatcher]:
-        input_node = list(self.config.input_nodes)[0]
-        batch, _, h, w = self.config.input_nodes[input_node]["shape"]
-        return UnetBatcher(self.config, "kandinsky-unet", (h, w))
+        return UnetBatcher(self.config, "kandinsky-unet", 1)
 
     @contextmanager
     def patch_ops(self) -> Generator[None, Any, None]:
@@ -28,9 +26,7 @@ class OverrideONNX(ONNXExporter):
 @ExporterFactory.register(Backend.TensorRT)
 class OverrideTensorRT(TensorRTExporter):
     def register_batcher(self) -> Optional[BaseBatcher]:
-        input_node = list(self.config.input_nodes)[0]
-        batch, _, h, w = self.config.input_nodes[input_node]["shape"]
-        return UnetBatcher(self.config, "kandinsky-unet", (h, w))
+        return UnetBatcher(self.config, "kandinsky-unet", 1)
 
     def register_tensorrt_plugins(self, network: trt.INetworkDefinition) -> trt.INetworkDefinition:
         return network

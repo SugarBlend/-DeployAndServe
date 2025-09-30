@@ -1,18 +1,13 @@
 from deploy2serve.deployment.core.exporters.calibration.batcher import BaseBatcher
-from deploy2serve.deployment.models.export import ExportConfig
 from diffusers import KandinskyV22PriorPipeline, KandinskyV22Pipeline
 from diffusers.pipelines.kandinsky2_2.pipeline_kandinsky2_2 import downscale_height_and_width
 import torch
-from typing import Any, Tuple, Optional, List, Union
+from typing import Any, Optional, List, Union
 
 
 class MOVQBatcher(BaseBatcher):
     encoder: KandinskyV22PriorPipeline
     decoder: KandinskyV22Pipeline
-    def __init__(self, config: ExportConfig, dataset_name: str, shape: Tuple[int, int]) -> None:
-        self.config = config
-        self.load_preprocess()
-        super().__init__(config, dataset_name, shape)
 
     def load_preprocess(self) -> None:
         if self.config.enable_mixed_precision:
@@ -27,7 +22,7 @@ class MOVQBatcher(BaseBatcher):
             low_cpu_mem_usage=True
         )
         # TODO: Deallocate
-        # self.encoder.to(device=self.config.device, dtype=dtype)
+        self.encoder.to(device=self.config.device, dtype=dtype)
 
         self.decoder = KandinskyV22Pipeline.from_pretrained(
             "kandinsky-community/kandinsky-2-2-decoder",

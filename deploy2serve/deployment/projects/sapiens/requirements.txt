@@ -1,6 +1,7 @@
-opencv-python==4.8.1.78
-numpy==1.26.4
-kornia==0.8.1
+opencv-python == 4.8.1.78
+numpy == 1.26.4
+kornia == 0.8.1
+mmengine == 0.10.7
 
 git+https://github.com/facebookresearch/sapiens.git#egg=sapiens-pretrain&subdirectory=pretrain
 git+https://github.com/facebookresearch/sapiens.git#egg=sapiens-pose&subdirectory=pose

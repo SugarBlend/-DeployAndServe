@@ -1,6 +1,5 @@
 weights_path: null
 config_path: null
-
 formats:
   - onnx
   - tensorrt
@@ -22,37 +21,42 @@ enable_benchmark: false
 enable_visualization: false
 
 executor:
-  module_path: deploy2serve.deployment.projects.kandinsky_2.clip.executor
+  module: deploy2serve.deployment.projects.kandinsky_2.clip.executor
   class_name: CLIPExecutor
 exporter:
-  module_path: deploy2serve.deployment.projects.kandinsky_2.clip.export
+  module: deploy2serve.deployment.projects.kandinsky_2.clip.export
   class_name: CLIPExporter
+
+calibration:
+  calibration_frames: null
+  excluded_frames: [ ]
+  labels_generator:
+    module: deploy2serve.deployment.core.exporters.calibration.generators.prompts
+    class_name: PromptGenerator
+  storage:
+    module: deploy2serve.deployment.core.exporters.calibration.dataset.zarr_dataset
+    class_name: ZarrChunkedDataset
+  cache_path: checkpoints/
 
 tensorrt:
   specific:
     log_level: INFO
-    precision: fp16
-    workspace: 134_217_728
+    precision: int8
+    workspace: 1_073_741_824
     flags:
       - TF32
       - DIRECT_IO
       - OBEY_PRECISION_CONSTRAINTS
       - SPARSE_WEIGHTS
+    network_creation_flag:
+      - EXPLICIT_BATCH
+    builder_optimization_level: 5
+    tiling_optimization_level: FULL
     profiling_verbosity: NONE
     max_aux_streams: 4
     runtime_platform: null
     compatibility_level: null
-    tactics: null
     algorithm: ENTROPY_CALIBRATION_2
-  dataset:
-    calibration_frames: null
-    exclude_frames: [ ]
-    labels_generator:
-      module_path: deploy2serve.deployment.core.exporters.calibration.generators.prompts
-      class_name: PromptGenerator
-    data_storage:
-      module_path: deploy2serve.deployment.core.exporters.calibration.dataset.zarr_dataset
-      class_name: ZarrChunkedDataset
   enable_timing_cache: true
   enable_calibration_cache: true
   output_file: checkpoints/kandinsky_2/clip/tensorrt/model.plan
@@ -65,26 +69,22 @@ onnx:
     verbose: null
     input_names: [input_ids]
     output_names: [last_hidden_state, text_embeds]
-    opset_version: 19
+    opset_version: 21
     training: EVAL
     do_constant_folding: true
-#  modelopt:
-#    quant_mode: fp8
-#    calib_method: max
-#    calib_buffer: 500
-#    calibration_eps:
-#      - cuda
-#      - cpu
-#      - dml
-#    op_types_to_quantize:
-#      - Conv
-#      - MatMul
-#    nodes_to_exclude:
-#      - /Shape
-#      - /LayerNormalization
-#    qdq_for_weights: false
-#    use_external_data_format: false
-#    keep_intermediate_files: false
+  modelopt:
+    quant_mode: int8
+    calib_method: entropy
+    calib_buffer: 1000
+    calibration_eps:
+      - cuda
+      - cpu
+      - dml
+    op_types_to_quantize:
+      - MatMul
+    qdq_for_weights: false
+    use_external_data_format: false
+    keep_intermediate_files: false
   simplify: false
   output_file: checkpoints/kandinsky_2/clip/onnx/model.onnx
   force_rebuild: true

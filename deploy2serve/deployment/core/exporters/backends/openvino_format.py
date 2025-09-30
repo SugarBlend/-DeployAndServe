@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 import numpy as np
 import torch
 from typing import Any, Optional
@@ -17,9 +16,7 @@ class OpenVINOExporter(BaseExporter):
         super(OpenVINOExporter, self).__init__(config)
 
         self.model: Optional[torch.nn.Module] = None
-        self.save_path = Path(self.config.openvino.output_file)
-        if not self.save_path.is_absolute():
-            self.save_path = Path.cwd().joinpath(self.save_path)
+        self.save_path = self.config.openvino.output_file
         self.save_path.parent.mkdir(exist_ok=True, parents=True)
         self.logger = get_logger(self.__class__.__name__)
 

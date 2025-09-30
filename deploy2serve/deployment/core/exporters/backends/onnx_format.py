@@ -14,7 +14,7 @@ from typing import Any, Dict, Optional, Tuple, List
 from deploy2serve.deployment.core.exporters.base import BaseExporter, ExportConfig, ExporterFactory
 from deploy2serve.deployment.core.exporters.calibration.batcher import BaseBatcher
 from deploy2serve.deployment.models.export import Backend
-from deploy2serve.deployment.utils.wrappers import timer
+from deploy2serve.deployment.utils.wrappers import timer, CudaMemoryManager
 from deploy2serve.utils.logger import get_logger
 
 
@@ -27,9 +27,7 @@ class ONNXExporter(BaseExporter):
         super(ONNXExporter, self).__init__(config)
 
         self.model: Optional[torch.nn.Module] = None
-        self.save_path = Path(self.config.onnx.output_file)
-        if not self.save_path.is_absolute():
-            self.save_path = Path.cwd().joinpath(self.save_path)
+        self.save_path = self.config.onnx.output_file
         self.save_path.parent.mkdir(exist_ok=True, parents=True)
 
         model_optimizations = self.config.onnx.modelopt
@@ -93,42 +91,42 @@ class ONNXExporter(BaseExporter):
         if providers:
             default_provider.insert(0, providers)
 
-        session, input_names, output_names = ORTExecutor.load(self.save_path, sess_options, default_provider)
-
         placeholders = (
             torch.zeros(self.config.input_nodes[node]["shape"],
-                        dtype=getattr(torch, self.config.input_nodes[node]["precision"]))
+                        dtype=getattr(torch, self.config.input_nodes[node]["precision"]),
+                        device=self.config.device)
             for node in self.config.input_nodes
         )
         placeholders = tuple(placeholders)
 
+        session, input_names, output_names = ORTExecutor.load(self.save_path, sess_options, default_provider)
         self.logger.info(f"Benchmark on tensor with shapes:")
         for idx, item in enumerate(placeholders):
             self.logger.info(f"Node '{input_names[idx]}': {tuple(item.shape)}")
 
-        input_feed = {name: placeholders[idx].numpy() for idx, name in enumerate(input_names)}
         self.logger.info(f"Benchmark for ONNX model:")
-        with timer(self.logger, self.config.repeats, warmup_iterations=50, cuda_profiling=False) as t:
-            t(lambda: session.run(output_names, input_feed))
-        onnx_output = session.run(output_names, input_feed)
-        del session
-        torch.cuda.empty_cache()
-
-        if self.model is None:
-            dtype = torch.float16 if self.config.enable_mixed_precision else torch.float32
-            self.model: torch.nn.Module = self.load_checkpoints(
-                config_path=self.config.config_path, weights_path=self.config.weights_path
-            )
-            self.model.to(device=self.config.device, dtype=dtype)
-            self.model.eval()
+        with CudaMemoryManager(cleanup=True) as context:
+            context.add_for_cleanup(session)
+            input_feed = {name: placeholders[idx].cpu().numpy() for idx, name in enumerate(input_names)}
+            with timer(self.logger, self.config.repeats, warmup_iterations=50, cuda_profiling=False) as t:
+                t(lambda: session.run(output_names, input_feed))
+            onnx_output = session.run(output_names, input_feed)
 
         self.logger.info(f"Benchmark for PyTorch model:")
-        with timer(self.logger, self.config.repeats, warmup_iterations=50, cuda_profiling=False) as t, torch.no_grad():
-            t(lambda: self.model(*(item.to(device=self.config.device) for item in placeholders)))
-        with torch.no_grad():
-            original_output = self.model(*(item.to(device=self.config.device) for item in placeholders))
-        del self.model
-        torch.cuda.empty_cache()
+        with CudaMemoryManager(cleanup=True) as context:
+            if self.model is None:
+                dtype = torch.float16 if self.config.enable_mixed_precision else torch.float32
+                self.model: torch.nn.Module = self.load_checkpoints(
+                    config_path=self.config.config_path, weights_path=self.config.weights_path
+                )
+                self.model.to(device=self.config.device, dtype=dtype)
+                self.model.eval()
+            context.add_for_cleanup(self.model)
+
+            with timer(self.logger, self.config.repeats, warmup_iterations=50, cuda_profiling=False) as t, torch.no_grad():
+                t(lambda: self.model(*placeholders))
+            with torch.no_grad():
+                original_output = self.model(*placeholders)
 
         if isinstance(original_output, torch.Tensor):
             original_output = [original_output.detach().cpu().numpy()]
@@ -172,7 +170,7 @@ class ONNXExporter(BaseExporter):
                 )
 
     def export(self) -> None:
-        if not (os.path.exists(self.save_path) and not self.config.onnx.force_rebuild):
+        if not (self.save_path.exists() and not self.config.onnx.force_rebuild):
             if self.model is None:
                 self.model: torch.nn.Module = self.load_checkpoints(
                     config_path=self.config.config_path, weights_path=self.config.weights_path
@@ -193,7 +191,7 @@ class ONNXExporter(BaseExporter):
         )
         placeholders = tuple(placeholders)
         options = self.config.onnx.specific.model_dump()
-        with tempfile.NamedTemporaryFile(suffix='.onnx', delete=False) as tmp_file:
+        with tempfile.NamedTemporaryFile(suffix=".onnx", delete=False) as tmp_file:
             temp_onnx_path = Path(tmp_file.name)
 
         try:
@@ -210,7 +208,7 @@ class ONNXExporter(BaseExporter):
                 onnx_model, self.save_path.as_posix(), save_as_external_data=True, all_tensors_to_one_file=True,
                 location="onnx_model.data", size_threshold=0,
             )
-            onnx.checker.check_model(self.save_path, full_check=True)
+            onnx.checker.check_model(self.save_path.as_posix(), full_check=True)
             self.logger.info(f"ONNX model successfully stored in: {self.save_path}")
         except Exception as error:
             self.logger.critical(f"Catch error while apply export: {error}")
@@ -227,7 +225,7 @@ class ONNXExporter(BaseExporter):
                 skip_fusion_patterns=False
             )
             onnx.checker.check_model(optimized_onnx_model, full_check=True)
-            onnx.save_model(optimized_onnx_model, self.save_path)
+            onnx.save_model(optimized_onnx_model, self.save_path.as_posix())
             self.logger.info(f"Simplification successfully done. ONNX model successfully stored in: {self.save_path}")
         except Exception as error:
             self.logger.critical(f"Catch error while apply optimizations: {error}")
@@ -241,7 +239,7 @@ class ONNXExporter(BaseExporter):
         if self.batcher:
             calibration_data = defaultdict(list)
             for i, inputs in enumerate(self.batcher.dataloader):
-                if i == self.config.onnx.modelopt.calib_buffer:
+                if i == self.config.calibration.calibration_frames:
                     break
                 [calibration_data[node].append(val.to(device="cpu").numpy().squeeze(axis=0))
                  for node, val in inputs.items()]

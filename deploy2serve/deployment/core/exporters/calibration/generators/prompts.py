@@ -13,7 +13,7 @@ import yaml
 class PromptGenerator(LabelsGenerator):
     def __init__(self, dataset_folder: Union[str, Path]) -> None:
         super().__init__(dataset_folder)
-        self.target_count = 1000 # final number of prompts
+        self.target_count = 1000  # final number of prompts
         self.batch_size = 50  # Prompts per request
         self.concurrent_requests = 3
         self.model: str = "mistral"
@@ -146,7 +146,7 @@ class PromptGenerator(LabelsGenerator):
             try:
                 with cache.open("r", encoding="utf-8") as file:
                     prompts = yaml.safe_load(file)
-                    if prompts and len(prompts) >= self.target_count:
+                    if prompts and len(prompts) >= self.target_count * 0.8:
                         self.logger.info(f"Loaded {len(prompts)} prompts from cache")
                         return prompts[:self.target_count]
             except Exception as error:

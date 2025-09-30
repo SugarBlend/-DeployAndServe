@@ -40,12 +40,10 @@ def get_device_info(logger: logging.Logger) -> None:
 
 @ExporterFactory.register(Backend.TensorRT)
 class TensorRTExporter(BaseExporter):
-    def __init__(self, config: ExportConfig):
+    def __init__(self, config: ExportConfig) -> None:
         super(TensorRTExporter, self).__init__(config)
 
-        self.save_path = Path(self.config.tensorrt.output_file)
-        if not self.save_path.is_absolute():
-            self.save_path = Path.cwd().joinpath(self.save_path)
+        self.save_path = self.config.tensorrt.output_file
         cache_path = f"{self.save_path.parent}/calibration_cache/{self.save_path.stem}.cache"
 
         if self.config.tensorrt.specific.precision in [trt.BuilderFlag.INT4, trt.BuilderFlag.INT8]:
@@ -213,7 +211,7 @@ class TensorRTExporter(BaseExporter):
         network: trt.INetworkDefinition
     ) -> None:
         if self.config.tensorrt.enable_timing_cache:
-            cache_folder = Path(self.save_path).parent.joinpath("timing_cache")
+            cache_folder = self.save_path.parent.joinpath("timing_cache")
             cache_folder.mkdir(parents=True, exist_ok=True)
             cache_file = cache_folder.joinpath(f"{self.save_path.stem}.cache")
             try:
@@ -239,10 +237,7 @@ class TensorRTExporter(BaseExporter):
         self.logger.info(f"TensorRT version: {trt.__version__}")
         get_device_info(self.logger)
 
-        Path(self.save_path).parent.mkdir(parents=True, exist_ok=True)
-
-        if not Path(self.config.onnx.output_file).is_absolute():
-            self.config.onnx.output_file = Path.cwd().joinpath(self.config.onnx.output_file).as_posix()
+        self.save_path.parent.mkdir(parents=True, exist_ok=True)
         current_folder = os.getcwd()
         # It is necessary so that TensorRT can pull up additional ONNX weight files.
         os.chdir(Path(self.config.onnx.output_file).parent)

@@ -1,6 +1,6 @@
+# General information about the network pytorch and pipeline stages.
 weights_path: null
 config_path: null
-
 formats:
   - onnx
   - tensorrt
@@ -24,13 +24,27 @@ repeats: 100
 enable_benchmark: false
 enable_visualization: false
 
+# Overriding base classes
 executor:
-  module_path: deploy2serve.deployment.projects.kandinsky_2.unet.executor
+  module: deploy2serve.deployment.projects.kandinsky_2.unet.executor
   class_name: UnetExecutor
 exporter:
-  module_path: deploy2serve.deployment.projects.kandinsky_2.unet.export
+  module: deploy2serve.deployment.projects.kandinsky_2.unet.export
   class_name: UnetExporter
 
+# Universal field structure for creating a batcher (onnx nvidia-modelopt, tensorrt)
+calibration:
+  calibration_frames: 1000
+  excluded_frames: [ ]
+  labels_generator:
+    module: deploy2serve.deployment.core.exporters.calibration.generators.prompts
+    class_name: PromptGenerator
+  storage:
+    module: deploy2serve.deployment.core.exporters.calibration.dataset.zarr_dataset
+    class_name: ZarrChunkedDataset
+  cache_path: checkpoints/
+
+# Description of fields for each framework from the specified pipeline
 tensorrt:
   specific:
     log_level: INFO
@@ -48,15 +62,6 @@ tensorrt:
     runtime_platform: null
     compatibility_level: null
     algorithm: ENTROPY_CALIBRATION_2
-  dataset:
-    calibration_frames: null
-    exclude_frames: [ ]
-    labels_generator:
-      module_path: deploy2serve.deployment.core.exporters.calibration.generators.prompts
-      class_name: PromptGenerator
-    data_storage:
-      module_path: deploy2serve.deployment.core.exporters.calibration.dataset.zarr_dataset
-      class_name: ZarrChunkedDataset
   enable_timing_cache: true
   enable_calibration_cache: true
   output_file: checkpoints/kandinsky_2/unet/tensorrt/model.plan
@@ -75,7 +80,6 @@ onnx:
   modelopt:
     quant_mode: int8
     calib_method: entropy
-    calib_buffer: 1000
     calibration_eps:
       - cuda
       - cpu

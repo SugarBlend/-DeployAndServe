@@ -1,9 +1,9 @@
+from pathlib import Path
 from pydantic import BaseModel, Field, field_validator
 import tensorrt as trt
 from typing import Dict, List, Optional, Tuple, Union, Literal
 
-from deploy2serve.deployment.models.common import Plugin, Precision, ModelMeta
-from deploy2serve.deployment.models.dataset import Dataset
+from deploy2serve.deployment.models.common import Plugin, Precision, ModelMeta, ResolvedPath
 
 # checked for TRT 10.10
 CompatibilityLevelType = Literal["AMPERE_PLUS", "NONE", "SAME_COMPUTE_CAPABILITY"]
@@ -112,8 +112,10 @@ class SpecificOptions(BaseModel, metaclass=ModelMeta):
     @field_validator("builder_optimization_level", mode="before")
     def validate_optimization_level(cls, val: int) -> int:
         if not 0 <= val <= 5:
-            cls.logger.warning(f"Builder optimization level must be between 0 and 5, but you provide: {val}, this "
-                                   "value was forcibly converted to default: 3")
+            cls.logger.warning(
+                f"Builder optimization level must be between 0 and 5, but you provide: {val}, this value was forcibly "
+                f"converted to default: 3"
+            )
             return 3
         return val
 
@@ -130,8 +132,9 @@ class SpecificOptions(BaseModel, metaclass=ModelMeta):
     ) -> Dict[str, List[Dict[str, Tuple[int, ...]]]]:
         for node in profile_shapes:
             if not len(profile_shapes[node]):
-                raise Exception("When specifying, each input node must have dimensions specified; the empty list "
-                                "state is excluded.")
+                raise Exception(
+                    "When specifying, each input node must have dimensions specified; the empty list state is excluded."
+                )
         return profile_shapes
 
     @field_validator("network_creation_flag", mode="before")
@@ -147,8 +150,10 @@ class SpecificOptions(BaseModel, metaclass=ModelMeta):
                 try:
                     vals[i] = getattr(trt.NetworkDefinitionCreationFlag, vals[i].upper())
                 except AttributeError as error:
-                    cls.logger.warning(f"The following field could not be found in the "
-                                       f"structure 'trt.NetworkDefinitionCreationFlag':{error}. Skip this flag.")
+                    cls.logger.warning(
+                        f"The following field could not be found in the structure "
+                        f"'trt.NetworkDefinitionCreationFlag':{error}. Skip this flag."
+                    )
         return vals
 
     @field_validator("precision", mode="before")
@@ -158,8 +163,10 @@ class SpecificOptions(BaseModel, metaclass=ModelMeta):
                 precision = getattr(trt.BuilderFlag, precision.upper())
             except AttributeError as error:
                 cls.logger.warning(error)
-                cls.logger.warning("After an error recognizing the precision parameter from the export config, this "
-                                   "value was forcibly converted to 'fp32'.")
+                cls.logger.warning(
+                    "After an error recognizing the precision parameter from the export config, this value was "
+                    "forcibly converted to 'fp32'."
+                )
                 precision = None
         return precision
 
@@ -174,8 +181,10 @@ class SpecificOptions(BaseModel, metaclass=ModelMeta):
             except AttributeError as error:
                 cls.logger.warning(error)
                 val = trt.ProfilingVerbosity.LAYER_NAMES_ONLY
-                cls.logger.warning(f"'profiling_verbosity' parameter was forced to the default value: {val}. Check the "
-                                   "possible values in the model field description.")
+                cls.logger.warning(
+                    f"'profiling_verbosity' parameter was forced to the default value: {val}. Check the possible "
+                    f"values in the model field description."
+                )
         return val
 
     @field_validator("tiling_optimization_level", mode="before")
@@ -184,8 +193,10 @@ class SpecificOptions(BaseModel, metaclass=ModelMeta):
         val: Optional[Union[str, trt.TilingOptimizationLevel]]
     ) -> Optional[trt.TilingOptimizationLevel]:
         if not hasattr(trt, "TilingOptimizationLevel"):
-            cls.logger.warning("TilingOptimizationLevel not available in this TensorRT version. "
-                               "This field must be supported in versions >= 10.")
+            cls.logger.warning(
+                "TilingOptimizationLevel not available in this TensorRT version. This field must be supported in "
+                "versions >= 10."
+            )
             return None
 
         if isinstance(val, str):
@@ -194,8 +205,10 @@ class SpecificOptions(BaseModel, metaclass=ModelMeta):
             except AttributeError as error:
                 cls.logger.warning(error)
                 val = trt.TilingOptimizationLevel.NONE
-                cls.logger.warning(f"'tiling_optimization_level' parameter was forced to the default value: {val}. "
-                                   "Check the possible values in the model field description.")
+                cls.logger.warning(
+                    f"'tiling_optimization_level' parameter was forced to the default value: {val}. Check the possible "
+                    f"values in the model field description."
+                )
         return val
 
     @field_validator("flags", mode="before")
@@ -205,8 +218,10 @@ class SpecificOptions(BaseModel, metaclass=ModelMeta):
                 try:
                     fields[i] = getattr(trt.BuilderFlag, fields[i].upper())
                 except AttributeError as error:
-                    cls.logger.warning(f"The following field could not be found in the "
-                                       f"structure 'trt.BuilderFlag':{error}. Skip this flag.")
+                    cls.logger.warning(
+                        f"The following field could not be found in the structure 'trt.BuilderFlag':{error}. Skip "
+                        f"this flag."
+                    )
                     fields.pop(i)
         return fields
 
@@ -217,8 +232,10 @@ class SpecificOptions(BaseModel, metaclass=ModelMeta):
                 try:
                     tactics[i] = getattr(trt.TacticSource, tactics[i].upper())
                 except AttributeError as error:
-                    cls.logger.warning(f"The following field could not be found in the "
-                                       f"structure 'trt.TacticSource':{error}. Skip this tactic.")
+                    cls.logger.warning(
+                        f"The following field could not be found in the structure 'trt.TacticSource':{error}. Skip "
+                        f"this tactic."
+                    )
                     tactics.pop(i)
         return tactics
 
@@ -229,9 +246,10 @@ class SpecificOptions(BaseModel, metaclass=ModelMeta):
                 algorithm = getattr(trt.CalibrationAlgoType, algorithm.upper())
             except AttributeError as error:
                 algorithm = trt.CalibrationAlgoType.ENTROPY_CALIBRATION_2
-                cls.logger.warning(f"The following field could not be found in the "
-                                   f"structure 'trt.CalibrationAlgoType':{error}. "
-                                   f"Return to default value: {algorithm}.")
+                cls.logger.warning(
+                    f"The following field could not be found in the structure 'trt.CalibrationAlgoType':{error}. "
+                    f"Return to default value: {algorithm}."
+                )
         return algorithm
 
     @field_validator("compatibility_level", mode="before")
@@ -240,8 +258,10 @@ class SpecificOptions(BaseModel, metaclass=ModelMeta):
         level: Optional[Union[str]]
     ) -> Optional["trt.HardwareCompatibilityLevel"]:
         if not hasattr(trt, "HardwareCompatibilityLevel"):
-            cls.logger.warning("HardwareCompatibilityLevel not available in this TensorRT version. "
-                               "This field must be supported in versions >= 9.")
+            cls.logger.warning(
+                "HardwareCompatibilityLevel not available in this TensorRT version. This field must be supported in "
+                "versions >= 9."
+            )
             return None
 
         if isinstance(level, str):
@@ -250,15 +270,19 @@ class SpecificOptions(BaseModel, metaclass=ModelMeta):
             except Exception as error:
                 cls.logger.warning(error)
                 level = trt.HardwareCompatibilityLevel.NONE
-                cls.logger.warning(f"'hardware_compatibility_level' parameter was forced to the default value: {level}. "
-                                   "Check the possible values in the model field description.")
+                cls.logger.warning(
+                    f"'hardware_compatibility_level' parameter was forced to the default value: {level}. Check the "
+                    f"possible values in the model field description."
+                )
         return level
 
     @field_validator("runtime_platform", mode="before")
     def validate_runtime_platform(cls, platform: Optional[str]) -> Optional["trt.RuntimePlatform"]:
         if not hasattr(trt, "RuntimePlatform"):
-            cls.logger.warning("RuntimePlatform not available in this TensorRT version. "
-                               "This field must be supported in versions >= 9.")
+            cls.logger.warning(
+                "RuntimePlatform not available in this TensorRT version. This field must be supported "
+                "in versions >= 9."
+            )
             return None
 
         if isinstance(platform, str):
@@ -267,8 +291,10 @@ class SpecificOptions(BaseModel, metaclass=ModelMeta):
             except Exception as error:
                 cls.logger.warning(error)
                 platform = trt.RuntimePlatform.SAME_AS_BUILD
-                cls.logger.warning(f"'hardware_compatibility_level' parameter was forced to the default value: {platform}. "
-                                   f"Check the possible values in the model field description.")
+                cls.logger.warning(
+                    f"'hardware_compatibility_level' parameter was forced to the default value: {platform}. Check the "
+                    f"possible values in the model field description."
+                )
         return platform
 
     class Config:
@@ -285,10 +311,17 @@ class TensorrtConfig(BaseModel):
         default=True,
         description="Enable cache for faster rebuild in next launch of the same model with int builder precision.",
     )
-    dataset: Optional[Dataset] = Field(default=None, description="")
     plugins: List[Plugin] = Field(default=[], description="List of plugins, which can be connect to model.")
     force_rebuild: bool = Field(default=False, description="Forcefully rebuild the existing model.")
-    output_file: str = Field(default="weights/tensorrt/model.plan", description="Path to save converted model.")
+    output_file: ResolvedPath = Field(
+        default="checkpoints/tensorrt/model.plan", description="Path to save converted model."
+    )
+
+    @field_validator("output_file", mode="before")
+    def convert_to_path(cls, val: str) -> Path:
+        if not val.strip():
+            raise ValueError("Path cannot be empty.")
+        return Path(val)
 
     class Config:
         arbitrary_types_allowed = True

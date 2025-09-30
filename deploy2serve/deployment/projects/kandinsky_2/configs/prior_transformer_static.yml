@@ -1,6 +1,5 @@
 weights_path: null
 config_path: null
-
 formats:
   - onnx
   - tensorrt
@@ -31,11 +30,22 @@ enable_benchmark: false
 enable_visualization: false
 
 executor:
-  module_path: deploy2serve.deployment.projects.kandinsky_2.prior.executor
+  module: deploy2serve.deployment.projects.kandinsky_2.prior.executor
   class_name: PriorExecutor
 exporter:
-  module_path: deploy2serve.deployment.projects.kandinsky_2.prior.export
+  module: deploy2serve.deployment.projects.kandinsky_2.prior.export
   class_name: PriorExporter
+
+calibration:
+  calibration_frames: 1000
+  excluded_frames: [ ]
+  labels_generator:
+    module: deploy2serve.deployment.core.exporters.calibration.generators.prompts
+    class_name: PromptGenerator
+  storage:
+    module: deploy2serve.deployment.core.exporters.calibration.dataset.zarr_dataset
+    class_name: ZarrChunkedDataset
+  cache_path: checkpoints/
 
 tensorrt:
   specific:
@@ -47,21 +57,12 @@ tensorrt:
       - DIRECT_IO
       - OBEY_PRECISION_CONSTRAINTS
       - SPARSE_WEIGHTS
+    builder_optimization_level: 5
     profiling_verbosity: NONE
     max_aux_streams: 4
     runtime_platform: null
     compatibility_level: null
-    tactics: null
     algorithm: ENTROPY_CALIBRATION_2
-  dataset:
-    calibration_frames: null
-    exclude_frames: [ ]
-    labels_generator:
-      module_path: deploy2serve.deployment.core.exporters.calibration.generators.prompts
-      class_name: PromptGenerator
-    data_storage:
-      module_path: deploy2serve.deployment.core.exporters.calibration.dataset.zarr_dataset
-      class_name: ZarrChunkedDataset
   enable_timing_cache: true
   enable_calibration_cache: true
   output_file: checkpoints/kandinsky_2/prior/tensorrt/model.plan
@@ -74,13 +75,12 @@ onnx:
     verbose: null
     input_names: [latent, timestep, prompt_embeds, encoder_hidden_states, attention_mask]
     output_names: [image_embeds]
-    opset_version: 21
+    opset_version: 20
     training: EVAL
     do_constant_folding: true
   modelopt:
     quant_mode: int8
     calib_method: entropy
-    calib_buffer: 1000
     calibration_eps:
       - cuda
       - cpu
@@ -90,7 +90,7 @@ onnx:
       - MatMul
     qdq_for_weights: false
     use_external_data_format: false
-    keep_intermediate_files: false
+    keep_intermediate_files: true
   simplify: false
   output_file: checkpoints/kandinsky_2/prior/onnx/model.onnx
   force_rebuild: true

@@ -1,18 +1,13 @@
 from deploy2serve.deployment.core.exporters.calibration.batcher import BaseBatcher
-from deploy2serve.deployment.models.export import ExportConfig
 from diffusers import KandinskyV22PriorPipeline, KandinskyV22Pipeline
 from diffusers.pipelines.kandinsky2_2.pipeline_kandinsky2_2 import downscale_height_and_width
 import torch
-from typing import Any, Tuple, Optional, List, Union
+from typing import Any, Optional, List, Union
 
 
 class UnetBatcher(BaseBatcher):
     encoder: KandinskyV22PriorPipeline
     decoder: KandinskyV22Pipeline
-    def __init__(self, config: ExportConfig, dataset_name: str, shape: Tuple[int, int]) -> None:
-        self.config = config
-        self.load_preprocess()
-        super().__init__(config, dataset_name, shape)
 
     def load_preprocess(self) -> None:
         if self.config.enable_mixed_precision:
@@ -88,13 +83,10 @@ class UnetBatcher(BaseBatcher):
         )
 
         self.decoder._num_timesteps = len(timesteps)
-        # restrict_value = random.choice(timesteps)
         for i, t in enumerate(timesteps):
             # expand the latents if we are doing classifier free guidance
             latent_model_input = torch.cat([latents] * 2) if self.decoder.do_classifier_free_guidance else latents
-            # if restrict_value == t:
             args = [latent_model_input, torch.tensor([t]), image_embeds]
-            #     break
         torch.cuda.empty_cache()
         torch.cuda.ipc_collect()
         return {

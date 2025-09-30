@@ -1,17 +1,12 @@
 from deploy2serve.deployment.core.exporters.calibration.batcher import BaseBatcher
-from deploy2serve.deployment.models.export import ExportConfig
 from diffusers import KandinskyV22PriorPipeline
 from transformers.models.clip.tokenization_clip import CLIPTokenizer
 import torch
-from typing import Any, Tuple
+from typing import Any
 
 
 class CLIPBatcher(BaseBatcher):
     tokenizer: CLIPTokenizer
-    def __init__(self, config: ExportConfig, dataset_name: str, shape: Tuple[int, int]) -> None:
-        self.config = config
-        self.load_preprocess()
-        super().__init__(config, dataset_name, shape)
 
     def load_preprocess(self) -> None:
         if self.config.enable_mixed_precision:
