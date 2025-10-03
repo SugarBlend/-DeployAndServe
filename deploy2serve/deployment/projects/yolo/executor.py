@@ -99,7 +99,7 @@ class YoloExecutor(ExtendExecutor):
 
         image = cv2.imread(str(file_path))
         tensor = self.preprocess(image)
-        output = self.infer(tensor, asynchronous=False)
+        output = self.infer({list(self.config.input_nodes)[0]: tensor}, asynchronous=False)
         boxes, scores, classes = self.postprocess(output, image.shape[:2])
         if len(boxes):
             for idx in range(tensor.shape[0]):

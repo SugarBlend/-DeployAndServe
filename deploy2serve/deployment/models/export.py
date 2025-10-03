@@ -80,7 +80,7 @@ class ExportConfig(BaseModel, metaclass=ModelMeta):
             with open(path, "r", encoding="utf-8") as file:
                 data = yaml.safe_load(file)
         else:
-            raise NotImplementedError("At now support configuration files with such extensions: '.json', '.yml'.")
+            raise NotImplementedError("At now support configuration files with such extensions: '.json', '.yaml'.")
 
         return ExportConfig.model_validate(data)
 

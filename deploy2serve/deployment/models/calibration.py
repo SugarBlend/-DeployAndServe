@@ -1,8 +1,7 @@
 from typing import List, Optional, Union
 from pathlib import Path
 from pydantic import BaseModel, Field, field_validator
-
-from deploy2serve.deployment.models.common import ComponentOverride, ResolvedPath
+from deploy2serve.deployment.models.common import ComponentOverride, ResolvedPath, is_url_urllib
 
 
 class RoboflowDataset(BaseModel):
@@ -18,20 +17,8 @@ class RoboflowDataset(BaseModel):
 class StandardDataset(BaseModel):
     name: str = Field(description="The code name of the data set, which will later be used as the section name in "
                                   "the converted data file.")
-    images: ResolvedPath = Field(description="Link to the archive containing the data set.")
-    annotations: ResolvedPath = Field(description="Link to an archive containing annotations to images.")
-
-    @field_validator("images", "annotations", mode="before")
-    def convert_to_path(cls, val: str) -> Path:
-        path = Path(val)
-
-        if not val.strip():
-            raise ValueError("Path cannot be empty.")
-
-        if not path.exists():
-            raise FileNotFoundError(f"Path does not exist: {path}")
-
-        return path
+    images: str = Field(description="Link to the archive containing the data set.")
+    annotations: str = Field(description="Link to an archive containing annotations to images.")
 
 
 class CalibrationConfig(BaseModel):

@@ -2,7 +2,6 @@ from abc import abstractmethod
 from contextlib import contextmanager
 from pathlib import Path
 import numpy as np
-import os
 import onnx
 from onnx.external_data_helper import convert_model_to_external_data
 import onnxslim

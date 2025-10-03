@@ -3,8 +3,8 @@ import importlib
 from typing import Any, Dict, Annotated
 from pathlib import Path
 from pydantic import AfterValidator
-
 from pydantic import BaseModel, Field, field_validator, ValidationInfo
+from urllib.parse import urlparse
 from deploy2serve.utils.logger import get_logger, get_project_root
 
 
@@ -36,6 +36,13 @@ class LoggingMeta(type):
 class ModelMeta(LoggingMeta, type(BaseModel)):
     pass
 
+
+def is_url_urllib(string: str) -> bool:
+    try:
+        result = urlparse(string)
+        return bool(result.scheme)
+    except (Exception, ):
+        return False
 
 def resolve_relative_path(v: Path) -> Path:
     if v.is_absolute():

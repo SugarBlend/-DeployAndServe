@@ -1,0 +1,120 @@
+weights_path: checkpoints/pytorch/yolo12m.pt
+config_path: null
+
+formats:
+  - openvino
+  - torchscript
+  - onnx
+  - tensorrt
+enable_mixed_precision: true
+input_nodes:
+  images:
+    shape: [1, 3, 384, 640]
+    precision: float16
+output_nodes:
+  output:
+    shape: [1, 84, 5040]
+    precision: float16
+device: cuda:0
+repeats: 1000
+enable_benchmark: false
+enable_visualization: true
+
+exporter:
+  module: deploy2serve.deployment.projects.yolo.export
+  class_name: YoloExporter
+executor:
+  module: deploy2serve.deployment.projects.yolo.executor
+  class_name: YoloExecutor
+
+calibration:
+#  description:
+#    name: coco
+#    images: "C:/Users/Alexander/Downloads/images"
+#    annotations: "C:/Users/Alexander/Downloads/annotations"
+#  description:
+#    name: coco
+#    images: "file:///C:/Users/Alexander/Downloads/val2017.zip"
+#    annotations: "file:///C:/Users/Alexander/Downloads/annotations_trainval2017.zip"
+  description:
+    name: coco
+    images: "http://images.cocodataset.org/zips/val2017.zip"
+    annotations: "http://images.cocodataset.org/annotations/annotations_trainval2017.zip"
+#  description:
+#    name: roboflow
+#    api_key: $API_KEY
+#    workspace: roboflow-gw7yv
+#    version_number: 2
+#    model_format: yolov5
+#    project_id: raccoon
+  calibration_frames: null
+  excluded_frames: [ ]
+  labels_generator:
+    module: deploy2serve.deployment.core.exporters.calibration.generators.coco
+    class_name: CocoGenerator
+#      module_path: deploy2serve.deployment.core.exporters.calibration.generators.roboflow
+#      class_name: RoboflowGenerator
+  storage:
+    module: deploy2serve.deployment.core.exporters.calibration.dataset.zarr_dataset
+    class_name: ZarrChunkedDataset
+#    module_path: deploy2serve.deployment.core.exporters.calibration.dataset.hdf5
+#    class_name: HDF5ChunkedDataset
+  cache_path: checkpoints/
+
+tensorrt:
+  specific:
+    log_level: ERROR
+    precision: int8
+    profile_shapes:
+      images:
+        - min: [1, 3, 384, 640]
+          opt: [4, 3, 384, 640]
+          max: [8, 3, 384, 640]
+    workspace: 268_435_456
+    flags:
+      - TF32
+      - DIRECT_IO
+#      - PREFER_PRECISION_CONSTRAINTS
+      - SPARSE_WEIGHTS
+    builder_optimization_level: 5
+    tiling_optimization_level: FULL
+    profiling_verbosity: NONE
+    algorithm: ENTROPY_CALIBRATION_2
+    runtime_platform: null
+    compatibility_level: null
+  enable_timing_cache: true
+  enable_calibration_cache: true
+  output_file: checkpoints/yolo/tensorrt/model.plan
+  force_rebuild: true
+
+onnx:
+  specific:
+    keep_initializers_as_inputs: false
+    export_params: true
+    verbose: null
+    input_names: [images]
+    output_names: [output]
+    opset_version: 11
+    dynamic_axes:
+      images:
+        0: batch
+      output:
+        0: batch
+    training: EVAL
+    do_constant_folding: true
+  simplify: true
+  output_file: checkpoints/yolo/onnx/model.onnx
+  force_rebuild: true
+
+torchscript:
+  optimize: false
+  output_file: checkpoints/yolo/torchscript/model.pt
+  force_rebuild: true
+
+openvino:
+  precision: fp16
+  output_file: checkpoints/yolo/openvino/model.xml
+  force_rebuild: true
+  input_names:
+    - images
+  device: CPU

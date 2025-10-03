@@ -34,7 +34,7 @@ class BaseBatcher(ABC):
         self.logger = get_logger(self.__class__.__name__)
 
         dataset_info = self.config.calibration.description
-        subfolder = f"/{dataset_info}" if dataset_info else ""
+        subfolder = dataset_info.name if dataset_info else ""
         self.dataset_folder = self.config.calibration.cache_path.joinpath(f"calibration_dataset", subfolder)
         dataset = self.check_dataset_file(dataset_name)
 

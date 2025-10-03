@@ -5,8 +5,8 @@ from typing import List, Literal, Tuple, Union, Dict
 import numpy as np
 import tensorrt as trt
 import torch
+from packaging import version
 from pydantic import BaseModel, Field
-from ultralytics.utils.checks import check_version
 
 from deploy2serve.deployment.core.executors.base import BaseExecutor, ExecutorFactory
 from deploy2serve.deployment.models.common import Backend
@@ -59,15 +59,15 @@ class TensorRTExecutor(BaseExecutor):
         self.bindings, self.binding_address, self.context = self.load(
             self.checkpoints_path,
             self.shapes,
-            f"{self.device.type}:{self.device.index}",
+            device,
             self.log_level
         )
         self.async_stream = torch.cuda.Stream(device=self.device, priority=-1)
+
+        self.input_nodes: List[str] = []
         for node in self.bindings:
             if self.bindings[node].io_mode == "input":
-                self.input_name = node
-                break
-        self.dtype = self.bindings[self.input_name].data.dtype
+                self.input_nodes.append(node)
 
     @staticmethod
     def _make_binding(name: str, dtype: type, shape: List[int], io_mode: str, device: str) -> Binding:
@@ -91,7 +91,7 @@ class TensorRTExecutor(BaseExecutor):
             model = runtime.deserialize_cuda_engine(file.read())
         bindings = OrderedDict()
 
-        if check_version(trt.__version__, "<=8.6.1") and check_version(trt.__version__, ">=8.2.5.1"):
+        if version.parse("8.2.5.1") <= version.parse(trt.__version__) <= version.parse("8.6.1"):
             for index in range(model.num_bindings):
                 name = model.get_binding_name(index)
                 dtype = trt.nptype(model.get_binding_dtype(index))
@@ -100,7 +100,7 @@ class TensorRTExecutor(BaseExecutor):
                     shape = model.get_binding_shape(index)
                 io_mode = "input" if model.binding_is_input(index) else "output"
                 bindings[name] = TensorRTExecutor._make_binding(name, dtype, shape, io_mode, device)
-        elif check_version(trt.__version__, ">9.1.0"):
+        elif version.parse(trt.__version__) > version.parse("9.1.0"):
             for index in range(model.num_io_tensors):
                 name = model.get_tensor_name(index)
                 dtype = trt.nptype(model.get_tensor_dtype(name))
@@ -117,14 +117,48 @@ class TensorRTExecutor(BaseExecutor):
 
         return bindings, binding_address, context
 
-    def infer(self, image: torch.Tensor, asynchronous: bool = False, **kwargs) -> List[torch.Tensor]:
-        image = image.to(self.dtype)
-        if check_version(trt.__version__, ">9.1.0"):
-            self.context.set_input_shape(self.input_name, image.shape)
+    @staticmethod
+    def remove_zero_batches(tensor: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
+        if tensor.dim() == 0 or tensor.size(0) == 0:
+            return tensor
+
+        if tensor.abs().max() <= eps:
+            empty_shape = (0,) + tensor.shape[1:]
+            return torch.empty(empty_shape, dtype=tensor.dtype, device=tensor.device)
+
+        first_non_zero = tensor[0].abs().max() > eps
+        last_non_zero = tensor[-1].abs().max() > eps
+
+        if first_non_zero and last_non_zero:
+            return tensor
+
+        if tensor.dim() == 1:
+            non_zero_mask = tensor.abs() > eps
         else:
-            self.context.set_binding_shape(0, image.shape)
-        batch_size = image.shape[0]
-        self.binding_address[self.input_name] = int(image.contiguous().data_ptr())
+            if tensor.dtype == torch.bool:
+                flattened = tensor.view(tensor.size(0), -1)
+                non_zero_mask = flattened.any(dim=1)
+            else:
+                flattened = tensor.view(tensor.size(0), -1)
+                non_zero_mask = flattened.abs().max(dim=1).values > eps
+
+        non_zero_indices = torch.where(non_zero_mask)[0]
+
+        if len(non_zero_indices) == 0:
+            empty_shape = (0,) + tensor.shape[1:]
+            return torch.empty(empty_shape, dtype=tensor.dtype, device=tensor.device)
+
+        return tensor[non_zero_indices]
+
+    def infer(self, input_feed: Dict[str, torch.Tensor], asynchronous: bool = False, **kwargs) -> List[torch.Tensor]:
+        for idx, node in enumerate(input_feed):
+            input_feed[node] = input_feed[node].to(device=self.device, dtype=self.bindings[node].data.dtype)
+            if node in self.input_nodes:
+                if version.parse(trt.__version__) > version.parse("9.1.0"):
+                    self.context.set_input_shape(node, input_feed[node].shape)
+                else:
+                    self.context.set_binding_shape(idx, input_feed[node].shape)
+                self.binding_address[node] = int(input_feed[node].contiguous().data_ptr())
 
         if asynchronous:
             for node in self.bindings:
@@ -133,4 +167,9 @@ class TensorRTExecutor(BaseExecutor):
         else:
             self.context.execute_v2(list(self.binding_address.values()))
 
-        return [self.bindings[node].data[:batch_size] for node in self.bindings if self.bindings[node].io_mode == "output"]
+        results: List[torch.Tensor] = []
+        for node in self.bindings:
+            if self.bindings[node].io_mode == "output":
+                cleaned_tensor = self.remove_zero_batches(self.bindings[node].data)
+                results.append(cleaned_tensor)
+        return results

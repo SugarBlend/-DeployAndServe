@@ -11,7 +11,6 @@ from deploy2serve.deployment.core.exporters.calibration.batcher import BaseBatch
 from deploy2serve.deployment.core.exporters.factory import Exporter
 from deploy2serve.deployment.core.exporters.backends.onnx_format import ONNXExporter
 from deploy2serve.deployment.core.exporters.backends.tensorrt_format import TensorRTExporter, ExporterFactory, Backend
-from deploy2serve.deployment.models.export import ExportConfig
 from deploy2serve.deployment.models.common import Plugin
 from deploy2serve.deployment.projects.yolo.model import Model, WrappedModel
 from deploy2serve.deployment.projects.yolo.batcher import DetectionBatcher
@@ -19,13 +18,8 @@ from deploy2serve.deployment.projects.yolo.batcher import DetectionBatcher
 
 @ExporterFactory.register(Backend.ONNX)
 class OverrideONNX(ONNXExporter):
-    def __init__(self, config: ExportConfig):
-        super().__init__(config)
-
     def register_batcher(self) -> Optional[BaseBatcher]:
-        input_node = list(self.config.input_nodes)[0]
-        batch, c, h, w = self.config.input_nodes[input_node]["shape"]
-        return DetectionBatcher(self.config, "yolo", (h, w))
+        return DetectionBatcher(self.config, "yolo", 1)
 
     @contextmanager
     def patch_ops(self) -> Generator[None, Any, None]:
@@ -47,13 +41,8 @@ class OverrideONNX(ONNXExporter):
 
 @ExporterFactory.register(Backend.TensorRT)
 class OverrideTensorRT(TensorRTExporter):
-    def __init__(self, config: ExportConfig):
-        super().__init__(config)
-
     def register_batcher(self) -> Optional[BaseBatcher]:
-        input_node = list(self.config.input_nodes)[0]
-        batch, c, h, w = self.config.input_nodes[input_node]["shape"]
-        return DetectionBatcher(self.config, "yolo", (h, w))
+        return DetectionBatcher(self.config, "yolo", 1)
 
     def register_tensorrt_plugins(self, network: trt.INetworkDefinition) -> trt.INetworkDefinition:
         available_plugins = {
@@ -250,9 +239,6 @@ def add_batched_nms_plugin(network: trt.INetworkDefinition, plugin: Plugin) -> t
 
 
 class YoloExporter(Exporter):
-    def __init__(self, config: ExportConfig) -> None:
-        super(YoloExporter, self).__init__(config)
-
     def load_checkpoints(
             self,
             weights_path: Union[str, Path],
