@@ -36,14 +36,11 @@ class PriorPipeline(KandinskyV22PriorPipeline, metaclass=LoggingMeta):
 
         self.text_encoder = TensorRTExecutor(
             f"{root}/checkpoints/kandinsky_2/text_encoder/tensorrt/model.plan",
-            {"input_ids": (1, 77), "last_hidden_state": (1, 77, 1280), "text_embeds": (1, 1280)},
             device, "ERROR"
         )
 
         self.prior = TensorRTExecutor(
             f"{root}/checkpoints/kandinsky_2/prior_transformer/tensorrt/model.plan",
-            {"latent": (2, 1280), "timestep": (1,), "prompt_embeds": (2, 1280),
-             "encoder_hidden_states": (2, 77, 1280), "attention_mask": (2, 77), "image_embeds": (2, 1280)},
             device, "ERROR"
         )
         self.prior.config = prior.config
@@ -51,7 +48,6 @@ class PriorPipeline(KandinskyV22PriorPipeline, metaclass=LoggingMeta):
 
         self.image_encoder = TensorRTExecutor(
             f"{root}/checkpoints/kandinsky_2/image_encoder/tensorrt/model.plan",
-            {"image": (1, 3, 224, 224)},
             device, "ERROR"
         )
         self.image_encoder.config = image_encoder.config

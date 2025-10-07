@@ -67,19 +67,21 @@ def setup_pipelines(
 
 
 def process_prompts(
-    prompts: List[str],
+    prompts: List[List[str]],
     prior_pipe: DiffusionPipeline,
     pipe: DiffusionPipeline,
     height: int = 768,
     width: int = 768,
     num_inference_steps: int = 50,
     show_preview: bool = True
-) -> float:
+) -> List[np.ndarray]:
     images: List[np.ndarray] = []
     with tqdm(prompts, desc="Generating images") as pbar:
-        for prompt in pbar:
-            click.echo(prompt)
-            image_emb, negative_image_emb = prior_pipe(prompt).to_tuple()
+        for prompts_group in pbar:
+            click.echo("Current launch prompts:")
+            for prompt in prompts_group:
+                click.echo(prompt)
+            image_emb, negative_image_emb = prior_pipe(prompts_group).to_tuple()
 
             result = pipe(
                 image_embeds=image_emb,
@@ -87,13 +89,17 @@ def process_prompts(
                 height=height,
                 width=width,
                 num_inference_steps=num_inference_steps,
-                output_type="np"
+                output_type="pil"
             ).images
+            result = np.asarray(result)
 
             if show_preview:
-                cv2.imshow("Generated Image", result[0])
+                cv2.destroyAllWindows()
+                for idx, image in enumerate(result):
+                    generated_frame = result[idx]
+                    cv2.imshow(f"Generated_frame_{idx}", generated_frame)
+                    images.append(generated_frame)
                 cv2.waitKey(30)
-            images.extend(images)
     return images
 
 
@@ -143,6 +149,12 @@ def process_prompts(
     help="Output image width."
 )
 @click.option(
+    "--prompts-per-infer",
+    default=4,
+    show_default=True,
+    help="The number of prompts that will be processed during one network inference."
+)
+@click.option(
     "--num-inference-steps",
     default=50,
     show_default=True,
@@ -173,6 +185,7 @@ def main(
     cache_dir: str,
     height: int,
     width: int,
+    prompts_per_infer: int,
     num_inference_steps: int,
     torch_dtype: str,
     no_preview: bool,
@@ -185,7 +198,6 @@ def main(
     }
     torch_dtype = dtype_map[torch_dtype]
 
-    # Create output directory if specified
     if output_dir:
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -201,6 +213,7 @@ def main(
         click.echo("Starting image generation...")
         start_time = time.perf_counter()
 
+        prompts = [prompts[i: i + prompts_per_infer] for i in range(0, len(prompts), prompts_per_infer)]
         images = process_prompts(
             prompts=prompts,
             prior_pipe=prior_pipe,
@@ -216,9 +229,9 @@ def main(
 
         if output_dir:
             click.echo(f"Saving images to {output_dir}...")
-            for i, (prompt, image) in enumerate(zip(prompts, images)):
-                filename = output_dir / f"image_{i:03d}.png"
-                cv2.imwrite(str(filename), cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+            for i, image in enumerate(images):
+                filename = output_dir.joinpath(f"image_{i:03d}_{version}.png")
+                cv2.imwrite(filename.as_posix(), image)
 
         click.echo("Generation completed")
         click.echo(f"Total time: {elapsed_time:.2f}s")

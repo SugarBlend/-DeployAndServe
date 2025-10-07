@@ -14,19 +14,18 @@ class Pipeline(KandinskyV22Pipeline,  metaclass=LoggingMeta):
     def __init__(self, unet: UNet2DConditionModel, scheduler: DDPMScheduler, movq: VQModel) -> None:
         super().__init__(unet=unet, scheduler=scheduler, movq=movq)
         root = get_project_root()
-
+        device = "cuda:0"
         self.unet = TensorRTExecutor(
             f"{root}/checkpoints/kandinsky_2/unet/tensorrt/model.plan",
-            {"latent": (2, 4, 96, 96), "timestep": (1,), "image_embeds": (2, 1280), "noise": (2, 8, 96, 96)},
-            "cuda:0", "ERROR"
+            device, "ERROR"
         )
+
         self.unet.config = unet.config
         self.unet.dtype = unet.dtype
 
         self.movq = TensorRTExecutor(
             f"{root}/checkpoints/kandinsky_2/movq/tensorrt/model.plan",
-            {"latent": (1, 4, 96, 96), "prediction": (1, 3, 768, 768)},
-            "cuda:0", "ERROR"
+            device, "ERROR"
         )
         torch.cuda.empty_cache()
 

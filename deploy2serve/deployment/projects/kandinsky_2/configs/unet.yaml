@@ -50,13 +50,26 @@ tensorrt:
     log_level: INFO
     precision: int8
     workspace: 2_684_354_560
+    profile_shapes:
+      latent:
+        - min: [2, 4, 32, 32]
+          opt: [4, 4, 64, 64]
+          max: [8, 4, 96, 96]
+      timestep:
+        - min: [1,]
+          opt: [1,]
+          max: [1,]
+      image_embeds:
+        - min: [ 2, 1280 ]
+          opt: [ 4, 1280 ]
+          max: [ 8, 1280]
     flags:
       - TF32
       - DIRECT_IO
       - OBEY_PRECISION_CONSTRAINTS
       - SPARSE_WEIGHTS
-    builder_optimization_level: 5
-    tiling_optimization_level: FULL
+    builder_optimization_level: 3
+    tiling_optimization_level: NONE
     profiling_verbosity: NONE
     max_aux_streams: 4
     runtime_platform: null
@@ -74,7 +87,14 @@ onnx:
     verbose: null
     input_names: [latent, timestep, image_embeds]
     output_names: [noise]
-    opset_version: 21
+    opset_version: 20
+    dynamic_axes:
+      latent:
+        0: batch
+        2: height
+        3: width
+      image_embeds:
+        0: batch
     training: EVAL
     do_constant_folding: true
   modelopt:

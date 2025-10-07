@@ -235,6 +235,7 @@ class ONNXExporter(BaseExporter):
         self.logger.info("Try to apply Post Training Quantization for ONNX model")
         calibration_data: Optional[Dict[str, List[np.ndarray]]] = None
 
+        calibration_shapes: Optional[str] = None
         if self.batcher:
             calibration_data = defaultdict(list)
             for i, inputs in enumerate(self.batcher.dataloader):
@@ -243,9 +244,12 @@ class ONNXExporter(BaseExporter):
                 [calibration_data[node].append(val.to(device="cpu").numpy().squeeze(axis=0))
                  for node, val in inputs.items()]
 
+            calibration_shapes = []
             for node in calibration_data:
                 dtype = np.dtype(self.config.input_nodes[node]["precision"])
                 calibration_data[node] = np.concatenate(calibration_data[node], axis=0, dtype=dtype)
+                calibration_shapes.append(f"{node}:" + "x".join(map(str, self.config.input_nodes[node]["shape"])))
+            calibration_shapes = ",".join(calibration_shapes)
         else:
             self.logger.warning("The implementation of the calibration data batcher is not defined. Random data will "
                                 "be used, and the calibration quality will be significantly degraded.")
@@ -256,6 +260,7 @@ class ONNXExporter(BaseExporter):
                 quantize_mode=self.config.onnx.modelopt.quant_mode,
                 calibration_method=self.config.onnx.modelopt.calib_method,
                 calibration_data=calibration_data,
+                calibration_shapes=calibration_shapes,
                 calibration_eps=self.config.onnx.modelopt.calibration_eps,
                 use_external_data_format=self.config.onnx.modelopt.use_external_data_format,
                 op_types_to_quantize=self.config.onnx.modelopt.op_types_to_quantize,

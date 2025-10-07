@@ -26,8 +26,9 @@ class ZarrChunkedDataset(ChunkedDataset):
         self.storage = zarr.open(self.path.as_posix(), mode="r")
         if hasattr(self.storage, self.group_name):
             self.dataset = self.storage[self.group_name]
-            self.num_samples = self.storage.attrs["num_samples"]
-            self.default_shapes = self.storage.attrs["dataset_info"]["nodes"]
+            if self.dataset.attrs:
+                self.num_samples = self.dataset.attrs["num_samples"]
+                self.default_shapes = self.dataset.attrs["dataset_info"]["nodes"]
             for name, data in self.dataset.items():
                 self.chunk_size[name] = data.chunks[0] if data.chunks else 32
 
@@ -97,7 +98,7 @@ class ZarrChunkedDataset(ChunkedDataset):
                     for key, batch_size in futures:
                         index[key] += batch_size
 
-            storage.attrs["num_samples"] = len(transform_args)
+            storage[self.group_name].attrs["num_samples"] = len(transform_args)
 
             with ThreadPoolExecutor(max_workers=2) as executor:
                 for tensor_dict in tqdm(executor.map(transform_fn, transform_args), total=len(transform_args),
@@ -110,7 +111,7 @@ class ZarrChunkedDataset(ChunkedDataset):
 
             _flush_all_buffers()
 
-            storage.attrs["dataset_info"] = {
+            storage[self.group_name].attrs["dataset_info"] = {
                 "nodes": {k: v.shape for k, v in sample_tensors.items()},
                 "created": datetime.now().strftime("%A, %B %d, %Y %H:%M:%S"),
             }

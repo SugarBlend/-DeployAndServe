@@ -43,6 +43,11 @@ tensorrt:
     log_level: INFO
     precision: int8
     workspace: 1_073_741_824
+    profile_shapes:
+      input_ids:
+        - min: [1, 77]
+          opt: [2, 77]
+          max: [4, 77]
     flags:
       - TF32
       - DIRECT_IO
@@ -69,7 +74,10 @@ onnx:
     verbose: null
     input_names: [input_ids]
     output_names: [last_hidden_state, text_embeds]
-    opset_version: 21
+    opset_version: 20
+    dynamic_axes:
+      input_ids:
+        0: batch
     training: EVAL
     do_constant_folding: true
   modelopt:

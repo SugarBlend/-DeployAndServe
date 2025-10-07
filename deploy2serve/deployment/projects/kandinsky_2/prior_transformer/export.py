@@ -32,7 +32,7 @@ class OverrideTensorRT(TensorRTExporter):
         return network
 
 
-class PriorExporter(Exporter):
+class PriorTransformerExporter(Exporter):
     def load_checkpoints(self, config_path: str, weights_path: str) -> torch.nn.Module:
         if self.config.enable_mixed_precision:
             dtype = torch.float16

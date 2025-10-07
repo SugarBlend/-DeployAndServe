@@ -52,6 +52,27 @@ tensorrt:
     log_level: INFO
     precision: int8
     workspace: 134_217_728
+    profile_shapes:
+      latent:
+        - min: [ 2, 1280 ]
+          opt: [ 4, 1280 ]
+          max: [ 8, 1280 ]
+      timestep:
+        - min: [1,]
+          opt: [1,]
+          max: [1,]
+      prompt_embeds:
+        - min: [ 2, 1280 ]
+          opt: [ 4, 1280]
+          max: [ 8, 1280]
+      encoder_hidden_states:
+        - min: [ 2, 77, 1280 ]
+          opt: [ 4, 77, 1280 ]
+          max: [ 8, 77, 1280]
+      attention_mask:
+        - min: [ 2, 77 ]
+          opt: [ 4, 77 ]
+          max: [ 8, 77 ]
     flags:
       - TF32
       - DIRECT_IO
@@ -76,6 +97,17 @@ onnx:
     input_names: [latent, timestep, prompt_embeds, encoder_hidden_states, attention_mask]
     output_names: [image_embeds]
     opset_version: 20
+    dynamic_axes:
+      latent:
+        0: batch
+      prompt_embeds:
+        0: batch
+      encoder_hidden_states:
+        0: batch
+      attention_mask:
+        0: batch
+      image_embeds:
+        0: batch
     training: EVAL
     do_constant_folding: true
   modelopt:

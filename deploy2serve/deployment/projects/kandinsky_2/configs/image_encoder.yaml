@@ -74,7 +74,7 @@ onnx:
     do_constant_folding: true
   modelopt:
     quant_mode: int8
-    calib_method: max
+    calib_method: entropy
     calibration_eps:
       - cuda
       - cpu

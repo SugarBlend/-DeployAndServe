@@ -40,12 +40,17 @@ tensorrt:
     log_level: INFO
     precision: int8
     workspace: 5_368_709_120
+    profile_shapes:
+      latent:
+        - min: [1, 4, 32, 32]
+          opt: [2, 4, 64, 64]
+          max: [4, 4, 96, 96]
     flags:
       - TF32
       - DIRECT_IO
       - OBEY_PRECISION_CONSTRAINTS
       - SPARSE_WEIGHTS
-    builder_optimization_level: 5
+    builder_optimization_level: 3
     profiling_verbosity: NONE
     max_aux_streams: 4
     runtime_platform: null
@@ -63,7 +68,12 @@ onnx:
     verbose: null
     input_names: [latent]
     output_names: [prediction]
-    opset_version: 21
+    opset_version: 20
+    dynamic_axes:
+      latent:
+        0: batch
+        2: height
+        3: width
     training: EVAL
     do_constant_folding: true
   modelopt:

@@ -8,6 +8,7 @@ from diffusers import KandinskyV22Pipeline
 import tensorrt as trt
 import torch
 from typing import Any, Generator, Optional
+from diffusers.models.autoencoders.vq_model import DecoderOutput
 
 
 @ExporterFactory.register(Backend.ONNX)
@@ -38,7 +39,12 @@ class MOVQDecodeWrapper(torch.nn.Module):
         self.model: torch.nn.Module = model
 
     def forward(self, quant: torch.Tensor) -> torch.Tensor:
-        return self.model.decode(quant)[0]
+        commit_loss = torch.zeros((quant.shape[0])).to(quant.device, dtype=quant.dtype)
+
+        quant2 = self.model.post_quant_conv(quant)
+        dec = self.model.decoder(quant2, quant if self.model.config.norm_type == "spatial" else None)
+
+        return DecoderOutput(sample=dec, commit_loss=commit_loss)[0]
 
 
 class MOVQExporter(Exporter):
