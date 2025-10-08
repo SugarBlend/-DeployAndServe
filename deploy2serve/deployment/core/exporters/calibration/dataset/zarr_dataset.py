@@ -21,7 +21,7 @@ class ZarrChunkedDataset(ChunkedDataset):
 
     def from_file(self, path: Union[str, Path] = None) -> None:
         if path:
-            self.path = path
+            self.path = Path(path)
 
         self.storage = zarr.open(self.path.as_posix(), mode="r")
         if hasattr(self.storage, self.group_name):
