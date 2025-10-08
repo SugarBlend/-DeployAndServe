@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Union, TYPE_CHECKING
+from typing import List, Union, TYPE_CHECKING, Dict
 
 import numpy as np
 import torch
@@ -13,13 +13,9 @@ if TYPE_CHECKING:
 
 @ExecutorFactory.register(Backend.OpenVINO)
 class OpenVINORTExecutor(BaseExecutor):
-    def __init__(self, checkpoints_path: str, device: str) -> None:
-        self.checkpoints_path: str = checkpoints_path
+    def __init__(self, checkpoints_path: Path, device: str) -> None:
+        self.checkpoints_path: Path = checkpoints_path
         self.device: torch.device = torch.device(device.lower())
-
-        if not Path(self.checkpoints_path).is_absolute():
-            self.checkpoints_path = Path.cwd().joinpath(self.checkpoints_path).as_posix()
-
         self.compiled_model = self.load(self.checkpoints_path, device)
 
     @staticmethod
@@ -42,8 +38,9 @@ class OpenVINORTExecutor(BaseExecutor):
         compiled_model = core.compile_model(model, device)
         return compiled_model
 
-    def infer(self, image: Union[torch.Tensor, np.ndarray], **kwargs) -> List[torch.Tensor]:
-        if isinstance(image, torch.Tensor):
-            image = image.cpu().numpy()
-        outputs = self.compiled_model(image)
+    def infer(self, input_feed: Dict[str, Union[torch.Tensor, np.ndarray]], **kwargs) -> List[torch.Tensor]:
+        for key in input_feed:
+            if isinstance(input_feed[key], torch.Tensor):
+                input_feed[key] = input_feed[key].cpu().numpy()
+        outputs = self.compiled_model(list(input_feed.values()))
         return [torch.from_numpy(output).to(self.device) for output in outputs.values()]

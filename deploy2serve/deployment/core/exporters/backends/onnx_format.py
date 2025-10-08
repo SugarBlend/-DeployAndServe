@@ -2,40 +2,47 @@ from abc import abstractmethod
 from contextlib import contextmanager
 from pathlib import Path
 import numpy as np
-import os
 import onnx
+from onnx.external_data_helper import convert_model_to_external_data
 import onnxslim
 import torch
+import tempfile
+from collections import defaultdict
 from typing import Any, Dict, Optional, Tuple, List
 
 from deploy2serve.deployment.core.exporters.base import BaseExporter, ExportConfig, ExporterFactory
 from deploy2serve.deployment.core.exporters.calibration.batcher import BaseBatcher
 from deploy2serve.deployment.models.export import Backend
-from deploy2serve.deployment.utils.wrappers import timer
+from deploy2serve.deployment.utils.wrappers import timer, CudaMemoryManager
 from deploy2serve.utils.logger import get_logger
 
 
 @ExporterFactory.register(Backend.ONNX)
 class ONNXExporter(BaseExporter):
     def __init__(
-            self,
-            config: ExportConfig
+        self,
+        config: ExportConfig
     ) -> None:
         super(ONNXExporter, self).__init__(config)
 
         self.model: Optional[torch.nn.Module] = None
-        self.save_path = Path(self.config.onnx.output_file)
-        if not self.save_path.is_absolute():
-            self.save_path = Path.cwd().joinpath(self.save_path)
+        self.save_path = self.config.onnx.output_file
         self.save_path.parent.mkdir(exist_ok=True, parents=True)
 
-        if self.config.onnx.modelopt.quant_mode and self.config.onnx.modelopt.calib_method:
+        model_optimizations = self.config.onnx.modelopt
+        if hasattr(model_optimizations, "quant_mode"):
             self.batcher: BaseBatcher = self.register_batcher()
 
         self.logger = get_logger(self.__class__.__name__)
 
     def load_checkpoints(self, *args, **kwargs) -> Any:
         raise NotImplementedError("Need to provide realization in child class.")
+
+    @abstractmethod
+    def register_batcher(self, *args, **kwargs) -> Any:
+        raise NotImplementedError(
+            "This method doesn't implemented, your should create him in custom class, based on 'ExtendExporter'."
+        )
 
     @abstractmethod
     def register_onnx_plugins(self) -> Any:
@@ -52,9 +59,9 @@ class ONNXExporter(BaseExporter):
 
     @torch.no_grad()
     def benchmark(
-            self,
-            sess_options: Optional["ort.SessionOptions"] = None,
-            providers: Optional[Tuple[str, Dict[str, Any]]] = None
+        self,
+        sess_options: Optional["ort.SessionOptions"] = None,
+        providers: Optional[Tuple[str, Dict[str, Any]]] = None
     ) -> None:
         import onnxruntime as ort
         from deploy2serve.deployment.core.executors.backends.onnxrt import ORTExecutor
@@ -83,33 +90,42 @@ class ONNXExporter(BaseExporter):
         if providers:
             default_provider.insert(0, providers)
 
-        session, input_names, output_names = ORTExecutor.load(self.save_path, sess_options, default_provider)
-
         placeholders = (
             torch.zeros(self.config.input_nodes[node]["shape"],
-                        dtype=getattr(torch, self.config.input_nodes[node]["precision"]))
+                        dtype=getattr(torch, self.config.input_nodes[node]["precision"]),
+                        device=self.config.device)
             for node in self.config.input_nodes
         )
         placeholders = tuple(placeholders)
 
+        session, input_names, output_names = ORTExecutor.load(self.save_path, sess_options, default_provider)
         self.logger.info(f"Benchmark on tensor with shapes:")
         for idx, item in enumerate(placeholders):
             self.logger.info(f"Node '{input_names[idx]}': {tuple(item.shape)}")
 
-        input_feed = {name: placeholders[idx].numpy() for idx, name in enumerate(input_names)}
-        self.logger.info(f"Benchmark ONNX model:")
-        with timer(self.logger, self.config.repeats, warmup_iterations=50, cuda_profiling=False) as t:
-            t(lambda: session.run(output_names, input_feed))
-        onnx_output = session.run(output_names, input_feed)
+        self.logger.info(f"Benchmark for ONNX model:")
+        with CudaMemoryManager(cleanup=True) as context:
+            context.add_for_cleanup(session)
+            input_feed = {name: placeholders[idx].cpu().numpy() for idx, name in enumerate(input_names)}
+            with timer(self.logger, self.config.repeats, warmup_iterations=50, cuda_profiling=False) as t:
+                t(lambda: session.run(output_names, input_feed))
+            onnx_output = session.run(output_names, input_feed)
 
-        if self.model is None:
-            self.model: torch.nn.Module = self.load_checkpoints(
-                config_path=self.config.config_path, weights_path=self.config.weights_path
-            )
-        self.logger.info(f"Benchmark Vanilla PyTorch model:")
-        with timer(self.logger, self.config.repeats, warmup_iterations=50, cuda_profiling=False) as t:
-            t(lambda: self.model(*(item.to(device=self.config.device) for item in placeholders)))
-        original_output = self.model(*(item.to(device=self.config.device) for item in placeholders))
+        self.logger.info(f"Benchmark for PyTorch model:")
+        with CudaMemoryManager(cleanup=True) as context:
+            if self.model is None:
+                dtype = torch.float16 if self.config.enable_mixed_precision else torch.float32
+                self.model: torch.nn.Module = self.load_checkpoints(
+                    config_path=self.config.config_path, weights_path=self.config.weights_path
+                )
+                self.model.to(device=self.config.device, dtype=dtype)
+                self.model.eval()
+            context.add_for_cleanup(self.model)
+
+            with timer(self.logger, self.config.repeats, warmup_iterations=50, cuda_profiling=False) as t, torch.no_grad():
+                t(lambda: self.model(*placeholders))
+            with torch.no_grad():
+                original_output = self.model(*placeholders)
 
         if isinstance(original_output, torch.Tensor):
             original_output = [original_output.detach().cpu().numpy()]
@@ -118,92 +134,142 @@ class ONNXExporter(BaseExporter):
         else:
             TypeError("Type of return value from pytorch model must be 'torch.Tensor' or equal Sequence of them.")
 
+        self.check_similarity(original_output, onnx_output, output_names)
+
+    def check_similarity(
+        self,
+        original_output: List[torch.Tensor],
+        onnx_output: List[np.ndarray],
+        output_nodes: List[str]
+    ) -> None:
         for i, (torch_out, onnx_out) in enumerate(zip(original_output, onnx_output)):
-            if not np.allclose(torch_out, onnx_out, rtol=1e-3, atol=1e-5):
-                max_diff = np.max(np.abs(torch_out - onnx_out))
-                self.logger.warning(f"Output {output_names[i]} is NOT close! Max diff: {max_diff:.4f}.")
+            if torch_out.shape != onnx_out.shape:
+                self.logger.critical(
+                    f"Shape mismatch for output {output_nodes[i]}: "
+                    f"PyTorch={torch_out.shape}, ONNX={onnx_out.shape}"
+                )
+                continue
+
+            abs_diff = np.abs(torch_out - onnx_out)
+            max_abs_diff = np.max(abs_diff)
+            mean_abs_diff = np.mean(abs_diff)
+
+            is_numerically_close = np.allclose(torch_out, onnx_out, rtol=1e-2, atol=1e-4)
+
+            if not is_numerically_close:
+                self.logger.warning(
+                    f"Output '{output_nodes[i]}' has numerical differences:\n"
+                    f"  Max absolute difference: {max_abs_diff:.6f}\n"
+                    f"  Mean absolute difference: {mean_abs_diff:.6f}\n"
+                )
             else:
-                self.logger.info(f"Output {output_names[i]}  is numerically close to PyTorch output.")
+                self.logger.info(
+                    f"Output '{output_nodes[i]}' is numerically close:\n"
+                    f"  Max difference: {max_abs_diff:.6f}"
+                )
 
     def export(self) -> None:
-        if os.path.exists(self.save_path) and not self.config.onnx.force_rebuild:
-            self.logger.info(f"ONNX model already exists at {self.save_path}. Skipping export.")
-            return
+        if not (self.save_path.exists() and not self.config.onnx.force_rebuild):
+            if self.model is None:
+                self.model: torch.nn.Module = self.load_checkpoints(
+                    config_path=self.config.config_path, weights_path=self.config.weights_path
+                )
+            self.torch2onnx()
+        if self.config.onnx.simplify:
+            self.simplify()
+        if self.config.onnx.modelopt:
+            self.quantize()
 
-        if self.model is None:
-            self.model: torch.nn.Module = self.load_checkpoints(
-                config_path=self.config.config_path, weights_path=self.config.weights_path
-            )
-
+    def torch2onnx(self) -> None:
         self.logger.info("Try convert PyTorch model to ONNX format")
         placeholders = (
             torch.zeros(self.config.input_nodes[node]["shape"],
-                        dtype=getattr(torch, self.config.input_nodes[node]["precision"]), device=self.config.device)
+                        dtype=getattr(torch, self.config.input_nodes[node]["precision"]),
+                        device=self.config.device)
             for node in self.config.input_nodes
         )
         placeholders = tuple(placeholders)
-
         options = self.config.onnx.specific.model_dump()
+        with tempfile.NamedTemporaryFile(suffix=".onnx", delete=False) as tmp_file:
+            temp_onnx_path = Path(tmp_file.name)
+
         try:
             with self.patch_ops():
-                torch.onnx.export(self.model, placeholders, self.save_path.as_posix(), **options)
+                torch.onnx.export(self.model, placeholders, temp_onnx_path.as_posix(), **options)
             self.register_onnx_plugins()
-            onnx.checker.check_model(self.save_path, full_check=True)
-
-            if self.config.onnx.simplify:
-                self.logger.info("Try to simplify ONNX model")
-                optimized_onnx_model = onnxslim.slim(
-                    self.save_path.as_posix(),
-                    skip_optimizations=False,
-                    skip_fusion_patterns=False
-                )
-                onnx.checker.check_model(optimized_onnx_model, full_check=True)
-                onnx.save_model(optimized_onnx_model, self.save_path)
-                self.logger.info("Simplification successfully done")
-
-            if self.config.onnx.modelopt.quant_mode and self.config.onnx.modelopt.calib_method:
-                self.quantize(onnx_path=self.save_path.as_posix())
+            onnx.checker.check_model(temp_onnx_path.as_posix(), full_check=True)
+            onnx_model = onnx.load_model(temp_onnx_path.as_posix())
+            convert_model_to_external_data(
+                onnx_model, all_tensors_to_one_file=True, location="onnx_model.data", size_threshold=0,
+                convert_attribute=False
+            )
+            onnx.save_model(
+                onnx_model, self.save_path.as_posix(), save_as_external_data=True, all_tensors_to_one_file=True,
+                location="onnx_model.data", size_threshold=0,
+            )
+            onnx.checker.check_model(self.save_path.as_posix(), full_check=True)
+            self.logger.info(f"ONNX model successfully stored in: {self.save_path}")
         except Exception as error:
             self.logger.critical(f"Catch error while apply export: {error}")
+        finally:
+            if temp_onnx_path.exists():
+                temp_onnx_path.unlink()
 
-        self.logger.info(f"ONNX model successfully stored in: {self.save_path}")
+    def simplify(self) -> None:
+        try:
+            self.logger.info("Try to simplify ONNX model")
+            optimized_onnx_model = onnxslim.slim(
+                self.save_path.as_posix(),
+                skip_optimizations=False,
+                skip_fusion_patterns=False
+            )
+            onnx.checker.check_model(optimized_onnx_model, full_check=True)
+            onnx.save_model(optimized_onnx_model, self.save_path.as_posix())
+            self.logger.info(f"Simplification successfully done. ONNX model successfully stored in: {self.save_path}")
+        except Exception as error:
+            self.logger.critical(f"Catch error while apply optimizations: {error}")
 
-    @abstractmethod
-    def register_batcher(self, *args, **kwargs) -> Any:
-        raise NotImplementedError(
-            "This method doesn't implemented, your should create him in custom class, based on 'ExtendExporter'."
-        )
-
-    def quantize(self, onnx_path: str) -> None:
+    def quantize(self) -> None:
         from modelopt.onnx.quantization.quantize import quantize as quantize_top_level_api
 
-        calibration_data = {node: [] for node in self.config.input_nodes}
-        for i, items in enumerate(self.batcher.dataloader):
-            if i == self.config.onnx.modelopt.calib_buffer:
-                break
-            for j, item in enumerate(items):
-                calibration_data[list(self.config.input_nodes)[j]].append(item.cpu().numpy())
+        self.logger.info("Try to apply Post Training Quantization for ONNX model")
+        calibration_data: Optional[Dict[str, List[np.ndarray]]] = None
 
-        dtype = np.float16 if self.config.enable_mixed_precision else np.float32
-        for node in calibration_data:
-            calibration_data[node] = np.concatenate(calibration_data[node], axis=0).astype(dtype)
+        calibration_shapes: Optional[str] = None
+        if self.batcher:
+            calibration_data = defaultdict(list)
+            for i, inputs in enumerate(self.batcher.dataloader):
+                if i == self.config.calibration.calibration_frames:
+                    break
+                [calibration_data[node].append(val.to(device="cpu").numpy().squeeze(axis=0))
+                 for node, val in inputs.items()]
 
-        short_dtype = "fp16" if self.config.enable_mixed_precision else "fp32"
+            calibration_shapes = []
+            for node in calibration_data:
+                dtype = np.dtype(self.config.input_nodes[node]["precision"])
+                calibration_data[node] = np.concatenate(calibration_data[node], axis=0, dtype=dtype)
+                calibration_shapes.append(f"{node}:" + "x".join(map(str, self.config.input_nodes[node]["shape"])))
+            calibration_shapes = ",".join(calibration_shapes)
+        else:
+            self.logger.warning("The implementation of the calibration data batcher is not defined. Random data will "
+                                "be used, and the calibration quality will be significantly degraded.")
 
-        quantize_top_level_api(
-            onnx_path=onnx_path,
-            quantize_mode=self.config.onnx.modelopt.quant_mode,
-            calibration_method=self.config.onnx.modelopt.calib_method,
-            calibration_data=calibration_data,
-            calibration_eps=self.config.onnx.modelopt.calibration_eps,
-            use_external_data_format=self.config.onnx.modelopt.use_external_data_format,
-            output_path=onnx_path,
-            op_types_to_quantize=self.config.onnx.modelopt.op_types_to_quantize,
-            nodes_to_exclude=self.config.onnx.modelopt.nodes_to_exclude,
-            dq_only=not self.config.onnx.modelopt.qdq_for_weights,
-            verbose=True,
-            high_precision_dtype=short_dtype,
-            mha_accumulation_dtype=short_dtype,
-            enable_gemv_detection_for_trt=False,
-            enable_shared_constants_duplication=False,
-        )
+        try:
+            quantize_top_level_api(
+                onnx_path=self.save_path.as_posix(),
+                quantize_mode=self.config.onnx.modelopt.quant_mode,
+                calibration_method=self.config.onnx.modelopt.calib_method,
+                calibration_data=calibration_data,
+                calibration_shapes=calibration_shapes,
+                calibration_eps=self.config.onnx.modelopt.calibration_eps,
+                use_external_data_format=self.config.onnx.modelopt.use_external_data_format,
+                op_types_to_quantize=self.config.onnx.modelopt.op_types_to_quantize,
+                nodes_to_exclude=self.config.onnx.modelopt.nodes_to_exclude,
+                dq_only=not self.config.onnx.modelopt.qdq_for_weights,
+                verbose=True,
+            )
+            self.config.onnx.output_file = self.save_path.with_suffix(".quant.onnx").as_posix()
+            self.logger.info(f"Quantization successfully done. ONNX model successfully stored "
+                             f"in: {self.config.onnx.output_file}")
+        except Exception as error:
+            self.logger.critical(f"Catch error while apply optimizations: {error}")

@@ -18,8 +18,11 @@ from deploy2serve.utils.logger import get_logger, get_project_root
 
 @ExporterFactory.register(Backend.ONNX)
 class OverrideONNX(ONNXExporter):
-    def __init__(self, config: ExportConfig) -> None:
-        super().__init__(config)
+    def register_batcher(self) -> Optional[BaseBatcher]:
+        if not Path(self.config.config_path).is_absolute():
+            self.config.config_path = get_project_root().joinpath(self.config.config_path).as_posix()
+        cfg = Config.fromfile(self.config.config_path)
+        return PoseBatcher(self.config, "sapiens", 1, cfg)
 
     @contextmanager
     def patch_ops(self) -> Generator[None, Any, None]:
@@ -31,17 +34,11 @@ class OverrideONNX(ONNXExporter):
 
 @ExporterFactory.register(Backend.TensorRT)
 class OverrideTensorRT(TensorRTExporter):
-    def __init__(self, config: ExportConfig) -> None:
-        super().__init__(config)
-
     def register_batcher(self) -> Optional[BaseBatcher]:
-        input_node = list(self.config.input_nodes)[0]
-        batch, c, h, w = self.config.input_nodes[input_node]["shape"]
-
         if not Path(self.config.config_path).is_absolute():
             self.config.config_path = get_project_root().joinpath(self.config.config_path).as_posix()
         cfg = Config.fromfile(self.config.config_path)
-        return PoseBatcher(self.config, "sapiens", (h, w), cfg)
+        return PoseBatcher(self.config, "sapiens", 8, cfg)
 
     def register_tensorrt_plugins(self, network: trt.INetworkDefinition) -> trt.INetworkDefinition:
         return network

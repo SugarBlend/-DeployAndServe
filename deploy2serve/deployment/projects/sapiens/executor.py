@@ -69,7 +69,7 @@ class SapiensExecutor(ExtendExecutor):
         h, w, c = image.shape
         tensor = torch.from_numpy(image).cuda().to(torch.float32).permute(2, 0, 1)
         self.preprocess(tensor, torch.tensor([[0, 0, w, h]]))
-        output = self.infer(self.batched_data.to(self.dtype), asynchronous=False)[0]
+        output = self.infer({list(self.config.input_nodes)[0]: self.batched_data.to(self.dtype)}, asynchronous=False)[0]
         joints, keypoint_scores = self.postprocess(output)
 
         batch_size, num_joints = keypoint_scores.shape

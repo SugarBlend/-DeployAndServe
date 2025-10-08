@@ -1,6 +1,11 @@
-opencv-python==4.8.1.78
-numpy==1.26.4
-kornia==0.8.1
+opencv-python == 4.8.1.78
+numpy == 1.26.4
+kornia == 0.8.1
+mmengine == 0.10.7
 
 git+https://github.com/facebookresearch/sapiens.git#egg=sapiens-pretrain&subdirectory=pretrain
 git+https://github.com/facebookresearch/sapiens.git#egg=sapiens-pose&subdirectory=pose
+
+torch == 2.3.0+cu121
+torchvision == 0.18.0+cu121
+--index-url https://download.pytorch.org/whl/cu121

@@ -4,7 +4,7 @@ dynamic = ["version"]
 requires-python = ">=3.10"
 
 [tool.poetry]
-version = "0.2.0"
+version = "0.3.0"
 readme = ["README.md"]
 packages = [
     { include = "deploy2serve/deployment", from = "." },
@@ -15,18 +15,16 @@ packages = [
 
 [tool.poetry.dependencies]
 numpy = "1.26.4"
-ultralytics = "^8.3.152"
-tensorrt = "10.10.0.31"
 onnx = "^1.18.0"
+onnxslim = "^0.1.56"
+onnxruntime-gpu = ">=1.18.1"
+tensorrt = "10.10.0.31"
 torch = {version = "2.3.0", source="pytorch"}
 torchvision = { version = "0.18.0", source = "pytorch" }
 torchaudio = { version = "2.3.0", source = "pytorch" }
-onnxruntime-gpu = ">=1.18.1"
 pydantic = {extras = ["all"], version = "^2.11.5"}
-onnxslim = "^0.1.56"
 fastapi = {extras = ["all"], version =  ">=0.115.12"}
-mmcv = {version = ">=2.2.0", source="mmcv_prebuilt"}
-mmengine = "0.10.7"
+omegaconf = "2.3.0"
 opencv-python = ">=4.8.1.78"
 opencv-contrib-python = ">=4.8.1.78"
 openvino = "2025.2.0"
@@ -62,9 +60,4 @@ bentoml = "^1.4.15"
 [[tool.poetry.source]]
 name = "pytorch"
 url = "https://download.pytorch.org/whl/cu121"
-priority = "explicit"
-
-[[tool.poetry.source]]
-name = "mmcv_prebuilt"
-url = "https://download.openmmlab.com/mmcv/dist/cu121/torch2.3/index.html"
 priority = "explicit"

@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from pathlib import Path
 import numpy as np
 import torch
@@ -20,25 +21,27 @@ class ZarrChunkedDataset(ChunkedDataset):
 
     def from_file(self, path: Union[str, Path] = None) -> None:
         if path:
-            self.path = path
+            self.path = Path(path)
 
         self.storage = zarr.open(self.path.as_posix(), mode="r")
         if hasattr(self.storage, self.group_name):
             self.dataset = self.storage[self.group_name]
-            for name, data in self.dataset.arrays():
-                self.num_samples[name] = data.shape[0]
+            if self.dataset.attrs:
+                self.num_samples = self.dataset.attrs["num_samples"]
+                self.default_shapes = self.dataset.attrs["dataset_info"]["nodes"]
+            for name, data in self.dataset.items():
                 self.chunk_size[name] = data.chunks[0] if data.chunks else 32
-                self.data_shape[name] = data[:self.chunk_size[name]].shape
 
     @property
     def filename(self) -> Path:
         return self.path
 
-    def get_chunk(self, node: str, chunk_idx: int) -> List[torch.Tensor]:
+    def get_chunk(self, node: str, chunk_idx: int) -> torch.Tensor:
+        bs = self.default_shapes[node][0]
         start = chunk_idx * self.chunk_size[node]
-        end = min(start + self.chunk_size[node], self.num_samples[node])
-        chunk = getattr(self.dataset, node)[start: end]
-        return [torch.from_numpy(item) for item in chunk]
+        end = min(start + self.chunk_size[node], self.num_samples)
+        chunk = self.dataset[node][bs * start: bs * end]
+        return torch.from_numpy(chunk)
 
     def create_dataset_file(
         self,
@@ -95,6 +98,8 @@ class ZarrChunkedDataset(ChunkedDataset):
                     for key, batch_size in futures:
                         index[key] += batch_size
 
+            storage[self.group_name].attrs["num_samples"] = len(transform_args)
+
             with ThreadPoolExecutor(max_workers=2) as executor:
                 for tensor_dict in tqdm(executor.map(transform_fn, transform_args), total=len(transform_args),
                                         desc="Preprocess & write", **self.progress_options):
@@ -105,3 +110,8 @@ class ZarrChunkedDataset(ChunkedDataset):
                             index[key] += written
 
             _flush_all_buffers()
+
+            storage[self.group_name].attrs["dataset_info"] = {
+                "nodes": {k: v.shape for k, v in sample_tensors.items()},
+                "created": datetime.now().strftime("%A, %B %d, %Y %H:%M:%S"),
+            }

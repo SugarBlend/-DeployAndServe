@@ -9,7 +9,7 @@ from mmpose.registry import DATASETS
 from mmpose import __file__ as mmpose_path
 from mmpose.models.data_preprocessors import PoseDataPreprocessor
 import torch
-from typing import Tuple, Optional, Dict, Any
+from typing import Optional, Dict, Any
 
 from deploy2serve.deployment.core.exporters.calibration.batcher import BaseBatcher, ExportConfig
 
@@ -40,14 +40,12 @@ def _get_dataset_metainfo(model_cfg: Config) -> Optional[Dict[str, Any]]:
 
 
 class PoseBatcher(BaseBatcher):
-    def __init__(self, config: ExportConfig, dataset_name: str, shape: Tuple[int, int], model_config: Config) -> None:
+    pipeline: Compose
+    data_preprocessor: PoseDataPreprocessor
+    meta_data: Config
+    def __init__(self, config: ExportConfig, dataset_name: str, batch_size: int, model_config: Config) -> None:
         self.model_config: Config = model_config
-
-        self.pipeline: Optional[Compose] = None
-        self.data_preprocessor: Optional[PoseDataPreprocessor] = None
-        self.meta_data: Optional[Config] = None
-        self.load_preprocess()
-        super().__init__(config, dataset_name, shape)
+        super().__init__(config, dataset_name, batch_size)
 
     def transformation(self, image_path: str, bboxes: list[np.ndarray], *args, **kwargs) -> Dict[str, torch.Tensor]:  # noqa: ANN002, ANN003, ARG002
         if len(self.config.input_nodes) != 1:
@@ -81,4 +79,3 @@ class PoseBatcher(BaseBatcher):
         params = self.model_config.model.data_preprocessor.to_dict()
         params.pop("type")
         self.data_preprocessor = PoseDataPreprocessor(**params)
-        self.dtype = torch.float16
