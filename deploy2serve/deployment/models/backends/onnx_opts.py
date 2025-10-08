@@ -1,11 +1,75 @@
+from pathlib import Path
+from pydantic import BaseModel, Field, field_validator
+from torch.onnx import _C_onnx
 from typing import Any, List, Mapping, Optional, Sequence, Union
 
-from pydantic import BaseModel, Field, field_validator
+from deploy2serve.deployment.models.common import Plugin, ModelMeta, ResolvedPath
 
-# from pathlib import Path
-from torch.onnx import _C_onnx
 
-from deploy2serve.deployment.models.common import Plugin
+class NvidiaModelOpt(BaseModel, metaclass=ModelMeta):
+    quant_mode: str = Field(description="Quantization mode. One of 'int8', 'int4' and 'fp8'.")
+    calib_method: str = Field(
+        description="Calibration method choices. Options are int8/fp8: {'entropy' (default), 'max'} and "
+                    "int4: {'awq_clip' (default), 'awq_lite', 'awq_full', 'rtn_dq'}."
+    )
+    calibration_eps: List[str] = Field(
+        default=["cuda"],
+        description="Priority order for the execution providers (EP) to calibrate the model. Any subset of: "
+                    "['NvTensorRtRtx', 'trt', 'cuda', 'dml', 'cpu']."
+    )
+    op_types_to_quantize: Optional[List[str]] = Field(
+        default=["MatMul"],
+        description="List of op types to quantize. If None, all supported operators are quantized. This flag does not "
+                    "support regular expression."
+    )
+    nodes_to_exclude: List[str] = Field(
+        default=[], description="List of node names to exclude from quantization."
+    )
+    qdq_for_weights: bool = Field(
+        default=False, description="If True, only add DQ nodes to the model. If False, add Q/DQ nodes to the model."
+    )
+    use_external_data_format: bool = Field(
+        default=False, description="If True, separate data path will be used to store the weights of the quantized model."
+    )
+    keep_intermediate_files: bool = Field(
+        default=False, description="If True, keep all intermediate files generated during the ONNX model's "
+                                   "conversion/calibration."
+    )
+
+    @field_validator("quant_mode", mode="before")
+    def validate_quant_mode(cls, val: str) -> str:
+        available_modes = ["int8", "int4", "fp8"]
+        if val not in available_modes:
+            raise Exception(f"Unknown quantization mode: {val}. Available modes: {available_modes}.")
+        return val
+
+    @field_validator("calib_method", mode="before")
+    def validate_calib_method(cls, val: str) -> str:
+        available_calib_methods = ["entropy", "max", "awq_clip", "awq_lite", "awq_full", "rtn_dq"]
+        if val not in available_calib_methods:
+            raise Exception(f"Unknown calib method: {val}. Available methods: {available_calib_methods}.")
+        return val
+
+    @field_validator("calibration_eps", mode="before")
+    def validate_calibration_eps(cls, val: List[str]) -> List[str]:
+        import onnxruntime as ort
+        correspondence = {
+            "trt": "TensorrtExecutionProvider",
+            "cuda": "CUDAExecutionProvider",
+            "cpu": "CPUExecutionProvider"
+        }
+        available_eps = ort.get_available_providers()
+        for i in range(len(val) - 1, -1, -1):
+            ep = correspondence.get(val[i])
+            if not ep or ep not in available_eps:
+                cls.logger.warning(f"It is not possible to use this provider: '{val[i]}' because the installed package "
+                                   f"does not support it.")
+                val.pop(i)
+        return val
+
+    class Config:
+        arbitrary_types_allowed = True
+        validate_default = True
 
 
 class SpecificOptions(BaseModel):
@@ -68,14 +132,26 @@ class SpecificOptions(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
+        validate_default = True
 
 
 class OnnxConfig(BaseModel):
     specific: SpecificOptions = Field(description="Specific options for build in onnx format.")
+    modelopt: Optional[NvidiaModelOpt] = Field(
+        default=None, description="This ONNX PTQ Toolkit provides a comprehensive suite of tools designed to optimize "
+                                  "ONNX (Open Neural Network Exchange) models through quantization."
+    )
     plugins: List[Plugin] = Field(default=[], description="List of plugins, which can be connect to model.")
-    simplify: bool = Field(default=True, description="Enable simplify onnx model structure.")
-    output_file: str = Field(default="weights/onnx/model.onnx", description="Path to save converted model.")
-    force_rebuild: bool = Field(description="Forcefully rebuild the existing model.")
+    simplify: bool = Field(default=False, description="Enable simplify onnx model structure.")
+    output_file: ResolvedPath = Field(default="weights/onnx/model.onnx", description="Path to save converted model.")
+    force_rebuild: bool = Field(default=False, description="Forcefully rebuild the existing model.")
+
+    @field_validator("output_file", mode="before")
+    def convert_to_path(cls, val: str) -> Path:
+        if not val.strip():
+            raise ValueError("Path cannot be empty.")
+        return Path(val)
 
     class Config:
         arbitrary_types_allowed = True
+        validate_default = True

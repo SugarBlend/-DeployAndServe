@@ -1,22 +1,25 @@
 import cv2
 import numpy as np
 import torch
-from typing import Optional, Tuple, Dict
+from typing import Dict
 from ultralytics.data.augment import LetterBox
 
-from deploy2serve.deployment.core.exporters.calibration.batcher import BaseBatcher, ExportConfig
+from deploy2serve.deployment.core.exporters.calibration.batcher import BaseBatcher
 
 
 class DetectionBatcher(BaseBatcher):
-    def __init__(self, config: ExportConfig, dataset_name: str, shape: Tuple[int, int]) -> None:
-        self.shape: Tuple[int, int] = shape
-        self.letterbox: Optional[LetterBox] = None
-        self.load_preprocess()
-        super().__init__(config, dataset_name, shape)
-        self.dtype = torch.float32
+    letterbox: LetterBox
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        input_node = list(self.config.input_nodes)[0]
+        # FIXME: Incorrect calibration when matching types, in theory it should be float16, but the output markings
+        #  are missing during calibration
+        self.config.input_nodes[input_node]["precision"] = "float32"
 
     def load_preprocess(self) -> None:
-        self.letterbox = LetterBox(new_shape=self.shape)
+        input_node = list(self.config.input_nodes)[0]
+        bs, ch, h, w = self.config.input_nodes[input_node]["shape"]
+        self.letterbox = LetterBox(new_shape=(h, w))
 
     def transformation(self, image_path: str, *args, **kwargs) -> Dict[str, torch.Tensor]:
         if len(self.config.input_nodes) != 1:

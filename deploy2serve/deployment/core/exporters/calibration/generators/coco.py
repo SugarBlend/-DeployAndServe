@@ -2,15 +2,12 @@ from collections import defaultdict
 from pathlib import Path
 from pycocotools.coco import COCO
 from tqdm import tqdm
-from typing import Any, Union, Dict, List
+from typing import Any, Dict, List
 
 from deploy2serve.deployment.core.exporters.calibration.generators.interface import LabelsGenerator
 
 
 class CocoGenerator(LabelsGenerator):
-    def __init__(self, dataset_folder: Union[str, Path]) -> None:
-        super().__init__(dataset_folder)
-
     def generate_labels(self) -> Dict[str, Any]:
         anns_by_img = defaultdict(list)
         detections: List[List[List[int]]] = []

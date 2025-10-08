@@ -1,10 +1,11 @@
-from contextlib import contextmanager
+from contextlib import contextmanager, ContextDecorator
 import logging
 import numpy as np
 from statistics import stdev
+import gc
 import time
 import torch
-from typing import List
+from typing import List, Any
 
 
 @contextmanager
@@ -46,3 +47,26 @@ def timer(
             logger.info(f"Throughput: {1000 / avg_time:.2f} FPS")
 
     yield measure
+
+
+class CudaMemoryManager(ContextDecorator):
+    def __init__(self, *objects: Any, cleanup: bool = True):
+        self.cleanup = cleanup
+        self._objects_to_cleanup = list(objects)
+
+    def __enter__(self) -> "CudaMemoryManager":
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        if self.cleanup:
+            self.clear()
+
+    def add_for_cleanup(self, *obj: Any) -> None:
+        self._objects_to_cleanup.extend(obj)
+
+    def clear(self) -> None:
+        self._objects_to_cleanup.clear()
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()

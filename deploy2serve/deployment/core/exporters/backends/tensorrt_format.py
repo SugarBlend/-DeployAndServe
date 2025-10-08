@@ -1,12 +1,13 @@
 import logging
 from abc import abstractmethod
+import copy
 import os
 from pathlib import Path
-from typing import Any, List, Optional, Tuple, Type
+from typing import Any, Optional, Tuple, Type, Iterable
 import sys
 import torch
 import tensorrt as trt
-from ultralytics.utils.checks import check_version
+from packaging import version
 
 from deploy2serve.deployment.core.exporters.base import BaseExporter, ExporterFactory
 from deploy2serve.deployment.core.exporters.calibration.batcher import BaseBatcher
@@ -15,6 +16,13 @@ from deploy2serve.deployment.models.export import ExportConfig
 from deploy2serve.deployment.models.common import Precision, Backend
 from deploy2serve.deployment.utils.wrappers import timer
 from deploy2serve.utils.logger import get_logger
+
+
+def create_bit_mask(flags: Iterable) -> int:
+    mask = 0
+    for flag in flags:
+        mask |= (1 << int(flag))
+    return mask
 
 
 def get_device_info(logger: logging.Logger) -> None:
@@ -32,12 +40,10 @@ def get_device_info(logger: logging.Logger) -> None:
 
 @ExporterFactory.register(Backend.TensorRT)
 class TensorRTExporter(BaseExporter):
-    def __init__(self, config: ExportConfig):
+    def __init__(self, config: ExportConfig) -> None:
         super(TensorRTExporter, self).__init__(config)
 
-        self.save_path = Path(self.config.tensorrt.output_file)
-        if not self.save_path.is_absolute():
-            self.save_path = Path.cwd().joinpath(self.save_path)
+        self.save_path = self.config.tensorrt.output_file
         cache_path = f"{self.save_path.parent}/calibration_cache/{self.save_path.stem}.cache"
 
         if self.config.tensorrt.specific.precision in [trt.BuilderFlag.INT4, trt.BuilderFlag.INT8]:
@@ -63,60 +69,74 @@ class TensorRTExporter(BaseExporter):
         from deploy2serve.deployment.core.executors.backends.tensrt import TensorRTExecutor
 
         self.logger.info(f"Start benchmark of model: {self.save_path}")
-
-        shapes = {node: self.config.input_nodes[node]["shape"] for node in self.config.input_nodes}
-        shapes.update({node: self.config.output_nodes[node]["shape"] for node in self.config.output_nodes})
-        bindings, binding_address, context = TensorRTExecutor.load(
-            self.save_path, shapes, self.config.device, trt.Logger.ERROR
-        )
-
-        self.logger.info(f"Benchmark on tensor with shapes:")
-        for idx, node in enumerate(bindings):
-            if bindings[node].io_mode == "input":
-                if check_version(trt.__version__, "<=8.6.1"):
-                    context.set_binding_shape(idx, bindings[node].shape)
-                elif check_version(trt.__version__, ">8.6.1"):
-                    context.set_input_shape(node, bindings[node].shape)
-            self.logger.info(f"Node '{node}': {tuple(bindings[node].shape)}")
+        executor = TensorRTExecutor(self.save_path, self.config.device, trt.Logger.ERROR)
+        input_feed = {
+            node: torch.ones(self.config.input_nodes[node]["shape"],
+                             dtype=getattr(torch, self.config.input_nodes[node]["precision"]),
+                             device=self.config.device)
+            for node in self.config.input_nodes
+        }
 
         with timer(self.logger, self.config.repeats, warmup_iterations=50) as t:
-            t(lambda: context.execute_v2(list(binding_address.values())))
+            t(lambda: executor.infer(input_feed, asynchronous=False))
 
     def _add_optimization_profiles(
-            self,
-            builder: trt.Builder,
-            config: trt.IBuilderConfig,
-            network: trt.INetworkDefinition,
-            logger: logging.Logger
+        self,
+        builder: trt.Builder,
+        config: trt.IBuilderConfig,
+        network: trt.INetworkDefinition,
+        logger: logging.Logger
     ) -> trt.IBuilderConfig:
-        profile = builder.create_optimization_profile()
+        profile_shapes = self.config.tensorrt.specific.profile_shapes
+        if profile_shapes:
+            network_inputs = {network.get_input(idx).name for idx in range(network.num_inputs)}
+            missing_inputs = network_inputs - set(profile_shapes.keys())
+            if missing_inputs:
+                raise Exception(f"Missing shape profiles for inputs: {missing_inputs}. Using default shapes may "
+                                "cause issues.")
 
-        for idx in range(network.num_inputs):
-            node = network.get_input(idx)
-            if node.name not in self.config.tensorrt.specific.profile_shapes:
-                continue
-            shapes = self.config.tensorrt.specific.profile_shapes[node.name][0]
-            profile.set_shape(node.name, **shapes)
+            # determine the number of profiles based on the maximum from the input nodes
+            num_profiles = max([len(profile_shapes[network.get_input(idx).name]) for idx in range(network.num_inputs)])
+            # If the number of profiles for the input nodes is not the same, then we copy the last known profile for
+            # the given node.
+            for node in profile_shapes:
+                lack = num_profiles - len(profile_shapes[node])
+                for _ in range(lack):
+                    profile_shapes[node].append(copy.deepcopy(profile_shapes[node][-1]))
 
-        if config.add_optimization_profile(profile) < 0:
-            logger.log(logger.WARNING, f"Invalid optimization profile {profile}")
-        if self.config.tensorrt.specific.precision.name in [trt.BuilderFlag.INT4.name, trt.BuilderFlag.INT8.name]:
-            config.set_calibration_profile(profile)
+            for profile_idx in range(num_profiles):
+                profile = builder.create_optimization_profile()
+
+                for idx in range(network.num_inputs):
+                    node = network.get_input(idx)
+                    if node.name not in profile_shapes:
+                        continue
+                    shapes = profile_shapes[node.name][profile_idx]
+                    profile.set_shape(node.name, **shapes)
+
+                if config.add_optimization_profile(profile) < 0:
+                    logger.log(logger.WARNING, f"Invalid optimization profile {profile}")
+
+                if (not profile_idx and self.config.tensorrt.specific.precision in
+                        [trt.BuilderFlag.INT4, trt.BuilderFlag.INT8]):
+                    config.set_calibration_profile(profile)
 
         return config
 
     def _apply_builder_flags(
-            self,
-            builder: trt.Builder,
-            config: trt.IBuilderConfig,
-            logger: trt.Logger
+        self,
+        builder: trt.Builder,
+        config: trt.IBuilderConfig,
+        logger: trt.Logger
     ) -> Tuple[trt.IBuilderConfig, trt.Builder]:
+        config.builder_optimization_level = self.config.tensorrt.specific.builder_optimization_level
         config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, self.config.tensorrt.specific.workspace)
-        if self.config.tensorrt.specific.profiling_verbosity:
-            config.profiling_verbosity = self.config.tensorrt.specific.profiling_verbosity
-        config.avg_timing_iterations = 8
+        config.profiling_verbosity = self.config.tensorrt.specific.profiling_verbosity
+        config.avg_timing_iterations = self.config.tensorrt.specific.avg_timing_iterations
+        if self.config.tensorrt.specific.tiling_optimization_level:
+            config.tiling_optimization_level = self.config.tensorrt.specific.tiling_optimization_level
 
-        if check_version(trt.__version__, ">=9.1.0"):
+        if version.parse(trt.__version__) >= version.parse("9.1.0"):
             if self.config.tensorrt.specific.runtime_platform:
                 config.runtime_platform = self.config.tensorrt.specific.runtime_platform
             if self.config.tensorrt.specific.compatibility_level:
@@ -130,23 +150,27 @@ class TensorRTExporter(BaseExporter):
                 from deploy2serve.deployment.utils.tensorrt_progress import ProgressMonitor  # noqa: PLC0415
                 config.progress_monitor = ProgressMonitor()
 
-        if self.config.tensorrt.specific.tactics and len(self.config.tensorrt.specific.tactics):
-            tactics: int = 0
-            for tactic in self.config.tensorrt.specific.tactics:
-                tactics |= 1 << int(tactic)
+        if len(self.config.tensorrt.specific.tactics):
+            tactics = create_bit_mask(self.config.tensorrt.specific.tactics)
             config.set_tactic_sources(tactics)
 
         for flag in [*self.config.tensorrt.specific.flags, self.config.tensorrt.specific.precision]:
+            if not flag:
+                continue
+
             if flag.name in dir(Precision):
                 try:
-                    if not getattr(builder, f"platform_has_fast_{flag.name}"):
+                    if not getattr(builder, f"platform_has_fast_{flag.name.lower()}"):
                         logger.log(
                             trt.Logger.WARNING,
-                            "This gpu device doesn't have fast computation " f"on {flag.name} precision",
+                            f"This gpu device doesn't have fast computation on {flag.name} precision",
                         )
                 except (AttributeError,):
                     pass
             config.set_flag(flag)
+
+        if self.config.tensorrt.specific.precision in [trt.BuilderFlag.FP4, trt.BuilderFlag.FP8]:
+            config.set_flag(trt.BuilderFlag.FP16)
 
         if self.config.tensorrt.specific.precision in [trt.BuilderFlag.INT4, trt.BuilderFlag.INT8]:
             config.set_flag(trt.BuilderFlag.FP16)
@@ -165,25 +189,25 @@ class TensorRTExporter(BaseExporter):
         logger.log(logger.INFO, f"Total outputs: {len(outputs)}")
 
         logger.log(logger.INFO, "== Network Inputs ==")
-        for i in inputs:
-            logger.log(logger.INFO, f"[Input] {i.name}: shape={i.shape}, dtype={i.dtype}")
+        for node in inputs:
+            logger.log(logger.INFO, f"[Input] {node.name}: shape={node.shape}, dtype={node.dtype}")
 
         logger.log(logger.INFO, "== Network Outputs ==")
-        for o in outputs:
-            logger.log(logger.INFO, f"[Output] {o.name}: shape={o.shape}, dtype={o.dtype}")
+        for node in outputs:
+            logger.log(logger.INFO, f"[Output] {node.name}: shape={node.shape}, dtype={node.dtype}")
 
     def _store_files(
-            self,
-            builder: trt.Builder,
-            config: trt.IBuilderConfig,
-            network: trt.INetworkDefinition
+        self,
+        builder: trt.Builder,
+        config: trt.IBuilderConfig,
+        network: trt.INetworkDefinition
     ) -> None:
         if self.config.tensorrt.enable_timing_cache:
-            cache_folder = Path(self.save_path).parent.joinpath("timing_cache")
+            cache_folder = self.save_path.parent.joinpath("timing_cache")
             cache_folder.mkdir(parents=True, exist_ok=True)
             cache_file = cache_folder.joinpath(f"{self.save_path.stem}.cache")
             try:
-                with open(cache_file, "rb") as file:
+                with cache_file.open("rb") as file:
                     timing_cache = config.create_timing_cache(file.read())
             except (IOError, TypeError):
                 timing_cache = config.create_timing_cache(b"")
@@ -198,17 +222,14 @@ class TensorRTExporter(BaseExporter):
         self.logger.info(f"TensorRT engine successfully stored in: {self.save_path}")
 
     def export(self) -> None:
-        if os.path.exists(self.save_path) and not self.config.tensorrt.force_rebuild:
+        if self.save_path.exists() and not self.config.tensorrt.force_rebuild:
             return
 
         self.logger.info("Try convert ONNX model to TensorRT engine")
         self.logger.info(f"TensorRT version: {trt.__version__}")
         get_device_info(self.logger)
 
-        Path(self.save_path).parent.mkdir(parents=True, exist_ok=True)
-
-        if not Path(self.config.onnx.output_file).is_absolute():
-            self.config.onnx.output_file = str(Path.cwd().joinpath(self.config.onnx.output_file))
+        self.save_path.parent.mkdir(parents=True, exist_ok=True)
         current_folder = os.getcwd()
         # It is necessary so that TensorRT can pull up additional ONNX weight files.
         os.chdir(Path(self.config.onnx.output_file).parent)
@@ -220,16 +241,17 @@ class TensorRTExporter(BaseExporter):
         trt.init_libnvinfer_plugins(logger, namespace="")
         builder = trt.Builder(logger)
         config = builder.create_builder_config()
-        network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
 
-        with open(self.config.onnx.output_file, "rb") as file, trt.OnnxParser(network, logger) as parser:
+        network_creation_flag = create_bit_mask(self.config.tensorrt.specific.network_creation_flag)
+        network = builder.create_network(network_creation_flag)
+
+        with Path(self.config.onnx.output_file).open("rb") as file, trt.OnnxParser(network, logger) as parser:
             if not parser.parse(file.read()):
                 for error in range(parser.num_errors):
-                    logger.log(logger.INTERNAL_ERROR, parser.get_error(error))
+                    logger.log(logger.INTERNAL_ERROR, str(parser.get_error(error)))
                 raise RuntimeError("ONNX parsing failed ...")
 
-        if self.config.tensorrt.specific.profile_shapes:
-            config = self._add_optimization_profiles(builder, config, network, logger)
+        config = self._add_optimization_profiles(builder, config, network, logger)
         config, builder = self._apply_builder_flags(builder, config, logger)
         network = self.register_tensorrt_plugins(network)
         self.log_network_io_info(network, logger)

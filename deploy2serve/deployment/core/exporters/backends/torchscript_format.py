@@ -1,6 +1,3 @@
-import os
-from copy import deepcopy
-from pathlib import Path
 from typing import Optional, Any
 import torch.jit
 
@@ -17,9 +14,7 @@ class TorchScriptExporter(BaseExporter):
         super(TorchScriptExporter, self).__init__(config)
 
         self.model: Optional[torch.nn.Module] = None
-        self.save_path = Path(self.config.torchscript.output_file)
-        if not self.save_path.is_absolute():
-            self.save_path = Path.cwd().joinpath(self.save_path)
+        self.save_path = self.config.torchscript.output_file
         self.save_path.parent.mkdir(exist_ok=True, parents=True)
         self.logger = get_logger(self.__class__.__name__)
 
@@ -49,7 +44,7 @@ class TorchScriptExporter(BaseExporter):
             t(lambda: self.traced_model(*placeholders))
 
     def export(self) -> None:
-        if os.path.exists(self.save_path) and not self.config.torchscript.force_rebuild:
+        if self.save_path.exists() and not self.config.torchscript.force_rebuild:
             return
 
         self.logger.info("Try convert PyTorch model to TorchScript format")
@@ -75,5 +70,5 @@ class TorchScriptExporter(BaseExporter):
                 self.logger.info("TorchScript model successfully optimized")
             except Exception as error:
                 self.logger.critical(error)
-        self.traced_model.save(self.save_path)
+        self.traced_model.save(self.save_path.as_posix())
         self.logger.info(f"TorchScript model successfully stored in: {self.save_path}")

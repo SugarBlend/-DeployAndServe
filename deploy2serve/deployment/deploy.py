@@ -18,16 +18,11 @@ def get_object(module_name: str, cls_name: str) -> Callable:
 
 def converter(args: Namespace) -> None:
     config = ExportConfig.from_file(args.deploy_config)
-
-    exporter = get_object(config.exporter.module_path, config.exporter.class_name)(config)
-
-    if not Path(config.weights_path).is_absolute():
-        config.weights_path = str(Path.cwd().joinpath(config.weights_path))
-
+    exporter = get_object(config.exporter.module, config.exporter.class_name)(config)
     for backend in config.formats:
         exporter.convert(backend)
         if config.enable_visualization:
-            executor_cls = get_object(config.executor.module_path, config.executor.class_name)
+            executor_cls = get_object(config.executor.module, config.executor.class_name)
             executor = executor_cls(exporter.config)
             executor.visualization(backend)
 

@@ -1,4 +1,4 @@
-weights_path: weights/pytorch/yolo12m.pt
+weights_path: checkpoints/pytorch/yolo12m.pt
 config_path: null
 
 formats:
@@ -22,10 +22,10 @@ enable_benchmark: true
 enable_visualization: true
 
 exporter:
-  module_path: deploy2serve.deployment.projects.yolo.export
+  module: deploy2serve.deployment.projects.yolo.export
   class_name: YoloExporter
 executor:
-  module_path: deploy2serve.deployment.projects.yolo.executor
+  module: deploy2serve.deployment.projects.yolo.executor
   class_name: YoloExecutor
 
 tensorrt:
@@ -49,15 +49,15 @@ tensorrt:
       - DIRECT_IO
       - PREFER_PRECISION_CONSTRAINTS
       - SPARSE_WEIGHTS
+    builder_optimization_level: 5
+    tiling_optimization_level: FULL
     profiling_verbosity: NONE
-    max_aux_streams: 4
     runtime_platform: null
     compatibility_level: null
-    tactics: null
     algorithm: ENTROPY_CALIBRATION_2
   enable_timing_cache: true
   enable_calibration_cache: true
-  output_file: weights/yolo/tensorrt/model.plan
+  output_file: checkpoints/yolo/tensorrt/model.plan
   force_rebuild: true
 
 onnx:
@@ -78,17 +78,17 @@ onnx:
     training: EVAL
     do_constant_folding: true
   simplify: true
-  output_file: weights/yolo/onnx/model.onnx
+  output_file: checkpoints/yolo/onnx/model.onnx
   force_rebuild: true
 
 torchscript:
   optimize: false
-  output_file: weights/yolo/torchscript/model.pt
+  output_file: checkpoints/yolo/torchscript/model.pt
   force_rebuild: true
 
 openvino:
   precision: fp16
-  output_file: weights/yolo/openvino/model.xml
+  output_file: checkpoints/yolo/openvino/model.xml
   force_rebuild: true
   input_names:
     - images

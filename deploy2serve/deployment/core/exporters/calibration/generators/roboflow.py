@@ -2,23 +2,20 @@ import numpy as np
 from pathlib import Path
 from PIL import Image
 from tqdm import tqdm
-from typing import Any, Union, Dict
-from mmengine.config import Config
+from typing import Any, Dict
+from omegaconf import OmegaConf
 from deploy2serve.deployment.core.exporters.calibration.generators.interface import LabelsGenerator
 from deploy2serve.utils.containers import is_image_file
 
 
 class RoboflowGenerator(LabelsGenerator):
-    def __init__(self, dataset_folder: Union[str, Path]) -> None:
-        super().__init__(dataset_folder)
-
     def generate_labels(self) -> Dict[str, Any]:
         roboflow_config = self.dataset_folder.joinpath("data.yaml")
         if not roboflow_config.exists():
             raise Exception("The data index file should be in the preloaded dataset from the Roboflow platform, but "
                             "it was not found.")
 
-        dataset_config = Config.fromfile(roboflow_config)
+        dataset_config = OmegaConf.load(roboflow_config)
         sections = ["train", "val", "test"]
         for field in sections:
             if hasattr(dataset_config, field):

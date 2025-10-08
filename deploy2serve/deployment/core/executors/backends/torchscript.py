@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Union
+from typing import List, Union, Dict
 import torch
 
 from deploy2serve.deployment.core.executors.base import BaseExecutor, ExecutorFactory
@@ -8,16 +8,12 @@ from deploy2serve.deployment.models.common import Backend
 
 @ExecutorFactory.register(Backend.TorchScript)
 class TorchScriptExecutor(BaseExecutor):
-    def __init__(self, checkpoints_path: str, device: str, enable_mixed_precision: bool) -> None:
-        self.checkpoints_path: str = checkpoints_path
+    def __init__(self, checkpoints_path: Path, device: str, enable_mixed_precision: bool) -> None:
+        self.checkpoints_path: Path = checkpoints_path
         self.device: torch.device = torch.device(device)
         self.enable_mixed_precision: bool = enable_mixed_precision
-
-        if not Path(self.checkpoints_path).is_absolute():
-            self.checkpoints_path = str(Path.cwd().joinpath(self.checkpoints_path))
-
         self.scripted_model = self.load(
-            self.checkpoints_path, f"{self.device.type}:{self.device.index}", self.enable_mixed_precision
+            self.checkpoints_path, device, self.enable_mixed_precision
         )
 
     @staticmethod
@@ -36,8 +32,9 @@ class TorchScriptExecutor(BaseExecutor):
         return scripted_model
 
     @torch.no_grad()
-    def infer(self, image: torch.Tensor, **kwargs) -> List[torch.Tensor]:
+    def infer(self, input_feed: Dict[str, torch.Tensor], **kwargs) -> List[torch.Tensor]:
         if self.enable_mixed_precision:
-            image = image.half()
-        outputs = self.scripted_model(image)
+            for node in input_feed.keys():
+                input_feed[node] = input_feed[node].half()
+        outputs = self.scripted_model(*list(input_feed.values()))
         return [outputs]
