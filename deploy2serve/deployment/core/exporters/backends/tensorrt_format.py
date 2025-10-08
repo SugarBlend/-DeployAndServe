@@ -69,24 +69,16 @@ class TensorRTExporter(BaseExporter):
         from deploy2serve.deployment.core.executors.backends.tensrt import TensorRTExecutor
 
         self.logger.info(f"Start benchmark of model: {self.save_path}")
-
-        shapes = {node: self.config.input_nodes[node]["shape"] for node in self.config.input_nodes}
-        shapes.update({node: self.config.output_nodes[node]["shape"] for node in self.config.output_nodes})
-        bindings, binding_address, context = TensorRTExecutor.load(
-            self.save_path, shapes, self.config.device, trt.Logger.ERROR
-        )
-
-        self.logger.info(f"Benchmark on tensor with shapes:")
-        for idx, node in enumerate(bindings):
-            if bindings[node].io_mode == "input":
-                if version.parse(trt.__version__) <= version.parse("8.6.1"):
-                    context.set_binding_shape(idx, bindings[node].shape)
-                elif version.parse(trt.__version__) > version.parse("8.6.1"):
-                    context.set_input_shape(node, bindings[node].shape)
-            self.logger.info(f"Node '{node}': {tuple(bindings[node].shape)}")
+        executor = TensorRTExecutor(self.save_path, self.config.device, trt.Logger.ERROR)
+        input_feed = {
+            node: torch.ones(self.config.input_nodes[node]["shape"],
+                             dtype=getattr(torch, self.config.input_nodes[node]["precision"]),
+                             device=self.config.device)
+            for node in self.config.input_nodes
+        }
 
         with timer(self.logger, self.config.repeats, warmup_iterations=50) as t:
-            t(lambda: context.execute_v2(list(binding_address.values())))
+            t(lambda: executor.infer(input_feed, asynchronous=False))
 
     def _add_optimization_profiles(
         self,

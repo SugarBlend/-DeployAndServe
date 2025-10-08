@@ -29,20 +29,7 @@ class ExtendExecutor(ABC):
 
     def _get_extra_kwargs(self, backend: Backend) -> dict:
         if backend == Backend.TensorRT:
-            profiles = self.config.tensorrt.specific.profile_shapes
-            shapes = {}
-            for node in profiles:
-                shapes.update({node: profiles[node][0]["max"]})
-
-            for node in self.config.input_nodes:
-                if node not in shapes:
-                    shapes.update({node: self.config.input_nodes[node]["shape"]})
-
-            for node in self.config.output_nodes:
-                shapes.update({node: self.config.output_nodes[node]["shape"]})
-
             return {
-                "shapes": shapes,
                 "log_level": self.config.tensorrt.specific.log_level,
             }
         elif backend == Backend.TorchScript:

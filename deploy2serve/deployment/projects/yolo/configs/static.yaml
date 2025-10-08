@@ -2,8 +2,8 @@ weights_path: checkpoints/pytorch/yolo12m.pt
 config_path: null
 
 formats:
-#  - openvino
-#  - torchscript
+  - openvino
+  - torchscript
   - onnx
   - tensorrt
 enable_mixed_precision: true
